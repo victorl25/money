@@ -622,6 +622,84 @@ a.cell-link:hover { text-decoration: underline; }
   min-height: 16px;
 }
 
+/* ── Dialog checkbox ─────────────────────────────────────────────────── */
+.dlg-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── Report Tabs ─────────────────────────────────────────────────────── */
+.rpt-layout {
+  padding: 28px 36px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.rpt-header { margin-bottom: 22px; }
+
+.rpt-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+}
+
+.rpt-subtitle {
+  font-size: 13px;
+  color: #666;
+}
+
+.rpt-table {
+  width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rpt-table thead th {
+  background: #2c3e50;
+  color: #fff;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.rpt-table th.rpt-col-num,
+.rpt-table td.rpt-col-num { text-align: right; }
+
+.rpt-table td {
+  padding: 7px 14px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.rpt-table tbody tr:nth-child(even) td { background: #f8f9fa; }
+.rpt-table tbody tr:hover td           { background: #eef2f7; }
+
+.rpt-col-name { width: 55%; }
+.rpt-col-num  { width: 22.5%; }
+
+.rpt-total-row td {
+  font-weight: 700;
+  background: #eef2f7 !important;
+  border-top: 2px solid #2c3e50;
+  border-bottom: none;
+}
+
+.rpt-empty {
+  padding: 14px;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+}
+
 /* ── Tabulator overrides ────────────────────────────────────────────── */
 .tabulator {
   border: none;

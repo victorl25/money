@@ -65,6 +65,7 @@ const QueryTab = (() => {
       virtualDom:         true,
       autoColumns:        true,
       headerSortTristate: true,
+      autoColumnsDefinitions: [{ headerSortTristate: true }],
     });
   }
 

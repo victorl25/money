@@ -3,7 +3,7 @@
 const App = (() => {
   let _activeTabId    = null;
   let _lastFileHandle = null;        // FileSystemFileHandle from last open/save
-  let _lastPrefix     = 'transactions'; // filename prefix for next save
+  let _lastPrefix     = 'money';     // filename prefix for next save
   let _dataDirUrl     = null;        // file:// URL for DATA_DIR (from ?dataDir= param)
 
   function _extractPrefix(filename) {
@@ -183,7 +183,7 @@ const App = (() => {
     if (!DB.isOpen()) { await Dialogs.alert('Save', 'No database is open.'); return; }
 
     const prefix = await Dialogs.prompt('Save Database',
-      'Enter a file name prefix (e.g. "transactions"):', _lastPrefix);
+      'Enter a file name prefix (e.g. "money"):', _lastPrefix);
     if (!prefix) return;
 
     const saveOpts = {
@@ -339,6 +339,148 @@ const App = (() => {
         : 'No duplicates found for this account.');
   }
 
+  async function cmdAssignCategory() {
+    if (!DB.isOpen()) { await Dialogs.alert('Assign Category', 'No database is open.'); return; }
+
+    const activeId = Tabs.getActiveId();
+    if (!activeId || !activeId.startsWith('trn-')) {
+      await Dialogs.alert('Assign Category', 'Please switch to a Transactions tab first.');
+      return;
+    }
+
+    const payees = DB.query(
+      'SELECT Payee_ID, Name FROM Payees WHERE Active = 1 ORDER BY Name');
+    if (!payees.length) {
+      await Dialogs.alert('Assign Category', 'No payees found.');
+      return;
+    }
+
+    const categories = DB.query(
+      'SELECT Category_ID, Name, Type FROM Categories WHERE Active = 1 ORDER BY Name');
+    if (!categories.length) {
+      await Dialogs.alert('Assign Category', 'No categories found.');
+      return;
+    }
+
+    const chosen = await Dialogs.selectPayeeAndCategory(payees, categories);
+    if (!chosen) return;
+
+    // Build query matching what the active tab displays, filtered to chosen payee
+    const filters = TransactionsTab.getTabFilters(activeId);
+    let sql = `
+      SELECT Transaction_ID FROM Transactions
+      WHERE Valid = 1 AND Payee_ID = ?`;
+    const params = [chosen.payeeId];
+    if (filters.accountId) { sql += ' AND Account_ID = ?';   params.push(filters.accountId); }
+    if (filters.catId)     { sql += ' AND Category_ID = ?';  params.push(filters.catId); }
+
+    const rows = DB.query(sql, params);
+    if (!rows.length) {
+      await Dialogs.alert('Assign Category', 'No transactions found for the selected payee in this tab.');
+      return;
+    }
+
+    for (const row of rows) {
+      DB.run('UPDATE Transactions SET Category_ID = ? WHERE Transaction_ID = ?',
+        [chosen.categoryId, row.Transaction_ID]);
+    }
+
+    TransactionsTab.refresh(activeId);
+    const count = rows.length;
+    await Dialogs.alert('Assign Category',
+      `Category updated on ${count} transaction${count === 1 ? '' : 's'}.`);
+  }
+
+  async function cmdMemoToPayee() {
+    if (!DB.isOpen()) { await Dialogs.alert('Memo to Payee', 'No database is open.'); return; }
+
+    const accounts = DB.query('SELECT Account_ID, Name, Type FROM Accounts WHERE Active = 1');
+    if (!accounts.length) {
+      await Dialogs.alert('Memo to Payee', 'No accounts found.');
+      return;
+    }
+
+    const accountId = await Dialogs.selectAccount('Memo to Payee', accounts,
+      'Select the account to process:');
+    if (accountId == null) return;
+
+    // Valid transactions with no payee and a non-empty memo
+    const rows = DB.query(
+      `SELECT Transaction_ID, Memo, Category_ID FROM Transactions
+       WHERE Account_ID = ? AND Valid = 1 AND Payee_ID IS NULL
+         AND Memo IS NOT NULL AND Memo != ''`,
+      [accountId]
+    );
+
+    if (!rows.length) {
+      await Dialogs.alert('Memo to Payee',
+        'No payee-less transactions with a memo were found for this account.');
+      return;
+    }
+
+    let count = 0;
+    for (const t of rows) {
+      const name = t.Memo.trim();
+      if (!name) continue;
+
+      // Resolve payee using the same 3-step import logic
+      let payeeId = DB.lookupPayee(name);
+      if (!payeeId) payeeId = DB.createPayee(name, false); // no alias on import
+
+      const catId = DB.getLastCategory(payeeId) || 1;
+
+      DB.run(
+        'UPDATE Transactions SET Payee_ID = ?, Category_ID = ? WHERE Transaction_ID = ?',
+        [payeeId, catId, t.Transaction_ID]
+      );
+      count++;
+    }
+
+    if (count > 0) onDataChanged(accountId);
+
+    await Dialogs.alert('Memo to Payee',
+      count > 0
+        ? `${count} transaction${count === 1 ? '' : 's'} updated.`
+        : 'No transactions were updated.');
+  }
+
+  async function cmdMergePayees() {
+    if (!DB.isOpen()) { await Dialogs.alert('Merge Payees', 'No database is open.'); return; }
+
+    const payees = DB.query('SELECT Payee_ID, Name FROM Payees WHERE Active = 1 ORDER BY Name');
+    if (payees.length < 2) {
+      await Dialogs.alert('Merge Payees', 'At least two active payees are required to merge.');
+      return;
+    }
+
+    const chosen = await Dialogs.selectMergePayees(payees);
+    if (!chosen) return;
+
+    const fromName = payees.find(p => p.Payee_ID === chosen.fromId)?.Name || chosen.fromId;
+    const toName   = payees.find(p => p.Payee_ID === chosen.toId)?.Name   || chosen.toId;
+
+    const ok = await Dialogs.confirm('Merge Payees',
+      `Reassign all transactions from "${fromName}" to "${toName}"?`);
+    if (!ok) return;
+
+    const rows = DB.query(
+      'SELECT Transaction_ID FROM Transactions WHERE Payee_ID = ? AND Valid = 1',
+      [chosen.fromId]
+    );
+    for (const r of rows) {
+      DB.run('UPDATE Transactions SET Payee_ID = ? WHERE Transaction_ID = ?',
+        [chosen.toId, r.Transaction_ID]);
+    }
+
+    onPayeesChanged();
+    onDataChanged(null);
+
+    await Dialogs.alert('Merge Payees',
+      rows.length > 0
+        ? `${rows.length} transaction${rows.length === 1 ? '' : 's'} reassigned from "${fromName}" to "${toName}".`
+        : `No transactions found for "${fromName}". No changes made.`);
+  }
+
   // ── Keyboard ────────────────────────────────────────────────────────────────
 
   document.addEventListener('keydown', e => {
@@ -378,14 +520,17 @@ const App = (() => {
     bind('cmd-import',          cmdImport);
     bind('cmd-apply-pattern',      cmdApplyPattern);
     bind('cmd-remove-duplicates',  cmdRemoveDuplicates);
+    bind('cmd-assign-category',    cmdAssignCategory);
+    bind('cmd-memo-to-payee',      cmdMemoToPayee);
+    bind('cmd-merge-payees',       cmdMergePayees);
     bind('cmd-query-db',           () => QueryTab.open());
     bind('cmd-view-accounts',   () => AccountsTab.open());
     bind('cmd-view-payees',     () => PayeesTab.open());
     bind('cmd-view-aliases',    () => AliasesTab.open());
     bind('cmd-view-patterns',   () => PatternsTab.open());
     bind('cmd-view-categories', () => CategoriesTab.open());
-    bind('cmd-report-category', () => Dialogs.alert('Reports', 'Spend by category — coming soon.'));
-    bind('cmd-report-payee',    () => Dialogs.alert('Reports', 'Spend by payee — coming soon.'));
+    bind('cmd-report-category', () => SpendByCategoryReport.open());
+    bind('cmd-report-payee',    () => SpendByPayeeReport.open());
   }
 
   function closeAllMenus() {

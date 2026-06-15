@@ -32,7 +32,7 @@ const TransactionsTab = (() => {
 
   // ── Data assembly ──────────────────────────────────────────────────────────
 
-  function buildTableData(accountId, payeeId, catId) {
+  function buildTableData(accountId, payeeId, catId, dateFrom, dateTo) {
     let sql = `
       SELECT t.Transaction_ID, t.Reference_ID, t.Date, t.Memo,
              t.Account_ID,  a.Name  AS Account_Name,
@@ -46,9 +46,11 @@ const TransactionsTab = (() => {
       LEFT JOIN Categories c ON t.Category_ID = c.Category_ID
       WHERE t.Valid = 1`;
     const params = [];
-    if (accountId) { sql += ' AND t.Account_ID = ?';  params.push(accountId); }
-    if (payeeId)   { sql += ' AND t.Payee_ID = ?';    params.push(payeeId); }
-    if (catId)     { sql += ' AND t.Category_ID = ?'; params.push(catId); }
+    if (accountId) { sql += ' AND t.Account_ID = ?';   params.push(accountId); }
+    if (payeeId)   { sql += ' AND t.Payee_ID = ?';     params.push(payeeId); }
+    if (catId)     { sql += ' AND t.Category_ID = ?';  params.push(catId); }
+    if (dateFrom)  { sql += ' AND t.Date >= ?';        params.push(dateFrom); }
+    if (dateTo)    { sql += ' AND t.Date <= ?';        params.push(dateTo); }
     sql += ' ORDER BY t.Date ASC, t.Transaction_ID ASC';
 
     const rows = DB.query(sql, params);
@@ -79,18 +81,22 @@ const TransactionsTab = (() => {
       const debit  = r.Amount < 0 ? Math.abs(r.Amount) : null;
       const credit = r.Amount > 0 ? r.Amount : null;
       if (showBalance && !r.Linked_Transaction_ID) bal += r.Amount;
+      const parts = [];
+      if (!r.Reviewed)              parts.push('Accept');
+      if (r.Linked_Transaction_ID)  parts.push('Merge', 'Unmerge');
       return {
         ...r,
-        Debit:   debit,
-        Credit:  credit,
-        Balance: showBalance && !r.Linked_Transaction_ID ? bal : null
+        Debit:        debit,
+        Credit:       credit,
+        Balance:      showBalance && !r.Linked_Transaction_ID ? bal : null,
+        _actionLabel: parts.join(' ')
       };
     });
   }
 
   // ── Autocomplete helpers ────────────────────────────────────────────────────
 
-  function attachPayeeAutocomplete(inputEl, listEl) {
+  function attachPayeeAutocomplete(inputEl, listEl, onSelect) {
     inputEl.addEventListener('input', () => {
       const q = inputEl.value.trim();
       if (!q) { listEl.innerHTML = ''; return; }
@@ -109,6 +115,7 @@ const TransactionsTab = (() => {
       inputEl.dataset.payeeId    = item.dataset.id;
       listEl.innerHTML           = '';
       inputEl.dispatchEvent(new Event('input'));
+      if (onSelect) onSelect(parseInt(item.dataset.id, 10), item.dataset.name);
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
   }
@@ -218,7 +225,21 @@ const TransactionsTab = (() => {
         <button id="${p}-accept"   class="btn btn-primary hidden">Accept</button>
       </div>`;
 
-    attachPayeeAutocomplete(fld(inst, 'payee'), fld(inst, 'payee-list'));
+    attachPayeeAutocomplete(fld(inst, 'payee'), fld(inst, 'payee-list'), (payeeId) => {
+      // If the transaction's category is Unassigned (ID=1 or blank), fill in
+      // the most recently used category for the selected payee.
+      const currentCatId = parseInt(fld(inst, 'category-id').value || '0', 10);
+      if (currentCatId <= 1) {
+        const lastCatId = DB.getLastCategory(payeeId);
+        if (lastCatId && lastCatId !== 1) {
+          const cat = DB.queryOne('SELECT Name FROM Categories WHERE Category_ID = ? AND Active = 1', [lastCatId]);
+          if (cat) {
+            fld(inst, 'category').value    = cat.Name;
+            fld(inst, 'category-id').value = String(lastCatId);
+          }
+        }
+      }
+    });
     attachAccountAutocomplete(fld(inst, 'dest'), fld(inst, 'dest-id'), fld(inst, 'dest-list'));
     attachCategoryAutocomplete(fld(inst, 'category'), fld(inst, 'category-id'), fld(inst, 'category-list'));
 
@@ -442,12 +463,15 @@ const TransactionsTab = (() => {
       if (payeeId) {
         // Typed name matched an existing payee
         if (oldPayeeId && oldPayeeId !== payeeId) {
-          // Switching to a different payee — merge old payee into new one
-          const ok = await Dialogs.confirm('Merge Payees',
-            `Move all transactions from "${oldPayeeName}" to "${payeeTxt}"?`);
-          if (!ok) return;
-          DB.run('UPDATE Transactions SET Payee_ID=? WHERE Payee_ID=?', [payeeId, oldPayeeId]);
-          DB.run('UPDATE Payees SET Active=0 WHERE Payee_ID=?', [oldPayeeId]);
+          // Switching to a different payee — merge or reassign
+          const choice = await Dialogs.confirmSingleAll('Change Payee',
+            `This transaction is linked to "${oldPayeeName}". ` +
+            `Change to "${payeeTxt}" for this transaction only (Single) or move all transactions from "${oldPayeeName}" to "${payeeTxt}" (All)?`);
+          if (!choice) return;
+          if (choice === 'all') {
+            DB.run('UPDATE Transactions SET Payee_ID=? WHERE Payee_ID=?', [payeeId, oldPayeeId]);
+            DB.run('UPDATE Payees SET Active=0 WHERE Payee_ID=?', [oldPayeeId]);
+          }
           const dup = DB.queryOne(
             'SELECT Alias_ID FROM Aliases WHERE Alias=? AND Payee_ID=? AND Active=1',
             [oldPayeeName, payeeId]);
@@ -464,17 +488,27 @@ const TransactionsTab = (() => {
           }
         }
       } else if (oldPayeeId) {
-        // No match — rename the existing linked payee; save old name as alias
-        const ok = await Dialogs.confirm('Rename Payee',
-          `Rename payee "${oldPayeeName}" to "${payeeTxt}"? The old name will be saved as an alias.`);
-        if (!ok) return;
-        DB.run('UPDATE Payees SET Name=? WHERE Payee_ID=?', [payeeTxt, oldPayeeId]);
-        const dup = DB.queryOne(
-          'SELECT Alias_ID FROM Aliases WHERE Alias=? AND Payee_ID=? AND Active=1',
-          [oldPayeeName, oldPayeeId]);
-        if (!dup) DB.run('INSERT INTO Aliases (Payee_ID,Alias,Active) VALUES (?,?,1)', [oldPayeeId, oldPayeeName]);
-        payeeId = oldPayeeId;
-        payeeModified = true; // renamed: payeeId === oldPayeeId so we flag explicitly
+        // No match — rename the existing linked payee, or create a new one for this transaction only
+        const choice = await Dialogs.confirmSingleAll('Change Payee',
+          `No payee named "${payeeTxt}" exists. ` +
+          `Rename "${oldPayeeName}" to "${payeeTxt}" for all transactions (All) or create a new payee for this transaction only (Single)?`);
+        if (!choice) return;
+        if (choice === 'all') {
+          DB.run('UPDATE Payees SET Name=? WHERE Payee_ID=?', [payeeTxt, oldPayeeId]);
+          const dup = DB.queryOne(
+            'SELECT Alias_ID FROM Aliases WHERE Alias=? AND Payee_ID=? AND Active=1',
+            [oldPayeeName, oldPayeeId]);
+          if (!dup) DB.run('INSERT INTO Aliases (Payee_ID,Alias,Active) VALUES (?,?,1)', [oldPayeeId, oldPayeeName]);
+          payeeId = oldPayeeId;
+          payeeModified = true; // renamed: payeeId === oldPayeeId so we flag explicitly
+        } else {
+          // Single — create a new payee, save the old (imported) name as its alias
+          payeeId = DB.createPayee(payeeTxt, false);
+          const dup = DB.queryOne(
+            'SELECT Alias_ID FROM Aliases WHERE Alias=? AND Payee_ID=? AND Active=1',
+            [oldPayeeName, payeeId]);
+          if (!dup) DB.run('INSERT INTO Aliases (Payee_ID,Alias,Active) VALUES (?,?,1)', [payeeId, oldPayeeName]);
+        }
         App.onPayeesChanged();
       } else {
         // No match, no prior payee — create new payee (with alias, form path)
@@ -688,6 +722,10 @@ const TransactionsTab = (() => {
     const ok = await Dialogs.confirm('Delete Transaction', msg);
     if (!ok) return;
 
+    const deletedPos = inst.table
+      ? inst.table.getRows('active').findIndex(r => r.getData().Transaction_ID === row.Transaction_ID)
+      : -1;
+
     DB.run('UPDATE Transactions SET Valid = 0 WHERE Transaction_ID = ?', [row.Transaction_ID]);
     DB.recalcAccountBalance(row.Account_ID, row.Transaction_ID);
 
@@ -700,32 +738,40 @@ const TransactionsTab = (() => {
     inst.selectedRow = null;
     clearTrnForm(inst);
     instSetDirty(inst, false);
-    refreshInstance(inst);
+    refreshInstance(inst, () => {
+      if (!inst.table) return;
+      const newRows = inst.table.getRows('active');
+      if (!newRows.length) return;
+      const target = newRows[Math.min(Math.max(deletedPos, 0), newRows.length - 1)];
+      inst.table.scrollToRow(target, 'center', false).catch(() => {});
+      target.getElement().click();
+    });
     App.onDataChanged(row.Account_ID);
   }
 
   // ── Instance refresh ───────────────────────────────────────────────────────
 
-  function refreshInstance(inst) {
+  function refreshInstance(inst, afterSetData) {
     let startBal = 0;
     if (inst.accountId && !inst.payeeId && !inst.catId) {
       const acc = DB.queryOne('SELECT Starting_Balance FROM Accounts WHERE Account_ID = ?', [inst.accountId]);
       startBal  = acc ? (acc.Starting_Balance || 0) : 0;
     }
-    const raw      = buildTableData(inst.accountId, inst.payeeId, inst.catId);
+    const raw      = buildTableData(inst.accountId, inst.payeeId, inst.catId, inst.dateFrom, inst.dateTo);
     const enriched = enrichRows(raw, startBal, true);
     if (inst.table) {
       const holder    = document.querySelector(`#trn-table-${inst.id} .tabulator-tableholder`);
       const scrollTop = holder ? holder.scrollTop : 0;
       inst.table.setData(enriched).then(() => {
         if (holder && scrollTop > 0) holder.scrollTop = scrollTop;
+        if (afterSetData) afterSetData();
       });
     }
   }
 
   // ── Tab construction ───────────────────────────────────────────────────────
 
-  function build(tabId, panel, accountId, payeeId, catId) {
+  function build(tabId, panel, accountId, payeeId, catId, dateFrom, dateTo) {
     panel.innerHTML = `
       <div class="tab-layout">
         <div id="trn-table-${tabId}" class="table-zone"></div>
@@ -734,7 +780,7 @@ const TransactionsTab = (() => {
         </div>
       </div>`;
 
-    const inst = { id: tabId, table: null, accountId, payeeId, catId, selectedRow: null, formDirty: false, isNewMode: false };
+    const inst = { id: tabId, table: null, accountId, payeeId, catId, dateFrom: dateFrom || null, dateTo: dateTo || null, selectedRow: null, formDirty: false, isNewMode: false };
     _instances[tabId] = inst;
 
     let startBal = 0;
@@ -742,7 +788,7 @@ const TransactionsTab = (() => {
       const acc = DB.queryOne('SELECT Starting_Balance FROM Accounts WHERE Account_ID = ?', [accountId]);
       startBal  = acc ? (acc.Starting_Balance || 0) : 0;
     }
-    const raw      = buildTableData(accountId, payeeId, catId);
+    const raw      = buildTableData(accountId, payeeId, catId, inst.dateFrom, inst.dateTo);
     const enriched = enrichRows(raw, startBal, true);
 
     const balCol = [{
@@ -751,11 +797,11 @@ const TransactionsTab = (() => {
     }];
 
     const acctCol = (!accountId) ? [{
-      title: 'Account', field: 'Account_Name', width: 140, headerFilter: 'input'
+      title: 'Account', field: 'Account_Name', width: 140, headerFilter: 'input', headerSortTristate: true
     }] : [];
 
     const catCol = catId ? [{
-      title: 'Category', field: 'Category_Name', width: 130, headerFilter: 'input'
+      title: 'Category', field: 'Category_Name', width: 130, headerFilter: 'input', headerSortTristate: true
     }] : [];
 
     inst.table = new Tabulator(`#trn-table-${tabId}`, {
@@ -768,15 +814,15 @@ const TransactionsTab = (() => {
       rowFormatter,
       columns: [
         { title: 'Date',   field: 'Date',       width: 100, sorter: 'date',
-          sorterParams: { format: 'YYYY-MM-DD' }, headerFilter: 'input' },
+          sorterParams: { format: 'YYYY-MM-DD' }, headerFilter: 'input', headerSortTristate: true },
         ...acctCol,
-        { title: 'Payee',  field: 'Payee_Name', widthGrow: 2, headerFilter: 'input' },
+        { title: 'Payee',  field: 'Payee_Name', widthGrow: 2, headerFilter: 'input', headerSortTristate: true },
         ...catCol,
-        { title: 'Debit',  field: 'Debit',  width: 100, formatter: currencyFormatter, hozAlign: 'right' },
-        { title: 'Credit', field: 'Credit', width: 100, formatter: currencyFormatter, hozAlign: 'right' },
+        { title: 'Debit',  field: 'Debit',  width: 100, formatter: currencyFormatter, hozAlign: 'right', headerSortTristate: true },
+        { title: 'Credit', field: 'Credit', width: 100, formatter: currencyFormatter, hozAlign: 'right', headerSortTristate: true },
         ...balCol,
-        { title: '', field: '_actions', width: 170, formatter: actionsFormatter,
-          headerSort: false,
+        { title: 'Action', field: '_actionLabel', width: 170, formatter: actionsFormatter,
+          headerSortTristate: true,
           cellClick: (e, cell) => {
             const t = e.target;
             if (!t.classList.contains('act-btn')) return;
@@ -831,6 +877,18 @@ const TransactionsTab = (() => {
     App.Tabs.open(tabId, catName, panel => build(tabId, panel, null, null, catId), true);
   }
 
+  function openForCategoryFiltered(catId, catName, dateFrom, dateTo, frameKey) {
+    const suffix = frameKey || 'all';
+    const tabId  = `trn-cat-${catId}-${suffix}`;
+    App.Tabs.open(tabId, catName, panel => build(tabId, panel, null, null, catId, dateFrom, dateTo), true);
+  }
+
+  function openForPayeeFiltered(payeeId, payeeName, dateFrom, dateTo, frameKey) {
+    const suffix = frameKey || 'all';
+    const tabId  = `trn-payee-${payeeId}-${suffix}`;
+    App.Tabs.open(tabId, payeeName, panel => build(tabId, panel, null, payeeId, null, dateFrom, dateTo), true);
+  }
+
   function refresh(tabId) {
     if (_instances[tabId]) refreshInstance(_instances[tabId]);
   }
@@ -859,6 +917,7 @@ const TransactionsTab = (() => {
   document.addEventListener('keydown', e => {
     if (!['ArrowUp', 'ArrowDown', 'Enter'].includes(e.key)) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (!document.getElementById('modal-backdrop').classList.contains('hidden')) return;
 
     const activeId = App.Tabs.getActiveId();
     if (!activeId || !activeId.startsWith('trn-')) return;
@@ -906,7 +965,7 @@ const TransactionsTab = (() => {
   });
 
   return {
-    openForAccount, openForPayee, openForCategory,
+    openForAccount, openForPayee, openForCategory, openForCategoryFiltered, openForPayeeFiltered,
     refresh, refreshAllForAccount, handleDeleteKey, removeInstance, getTabFilters
   };
 })();

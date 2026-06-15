@@ -60,6 +60,7 @@ const PayeesTab = (() => {
     const name = document.getElementById('fp-name').value.trim();
     if (!name) { await Dialogs.alert('Validation', 'Name is required.'); return; }
 
+    const editedId = (!_isNewMode && _selectedRow) ? _selectedRow.Payee_ID : null;
     if (_isNewMode) {
       DB.createPayee(name);
     } else if (_selectedRow) {
@@ -67,7 +68,14 @@ const PayeesTab = (() => {
     }
     _isNewMode = false;
     setDirty(false);
-    refresh();
+    if (editedId) {
+      _table.setData(loadData()).then(() => {
+        const row = _table.getRows('active').find(r => r.getData().Payee_ID === editedId);
+        if (row) { _selectedRow = row.getData(); row.select(); _table.scrollToRow(row, 'center', false).catch(() => {}); }
+      });
+    } else {
+      refresh();
+    }
     App.onPayeesChanged();
   }
 
@@ -90,8 +98,8 @@ const PayeesTab = (() => {
       selectableRows: 1,
       headerSortTristate: true,
       columns: [
-        { title: 'Name',             field: 'Name',             widthGrow: 2, formatter: nameFormatter, headerFilter: 'input' },
-        { title: 'Last Transaction', field: 'Last_Transaction', width: 160 }
+        { title: 'Name',             field: 'Name',             widthGrow: 2, formatter: nameFormatter, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Last Transaction', field: 'Last_Transaction', width: 160, headerSortTristate: true }
       ]
     });
 
@@ -130,11 +138,18 @@ const PayeesTab = (() => {
     const ok = await Dialogs.confirm('Delete Payee',
       `Set payee "${_selectedRow.Name}" as inactive?`);
     if (ok) {
+      const pos = _table.getRows('active').findIndex(r => r.getData().Payee_ID === id);
       DB.run('UPDATE Payees SET Active = 0 WHERE Payee_ID = ?', [id]);
       _selectedRow = null;
       if (document.getElementById('fp-name')) document.getElementById('fp-name').value = '';
       setDirty(false);
-      refresh();
+      _table.setData(loadData()).then(() => {
+        const newRows = _table.getRows('active');
+        if (!newRows.length) return;
+        const target = newRows[Math.min(Math.max(pos, 0), newRows.length - 1)];
+        _table.scrollToRow(target, 'center', false).catch(() => {});
+        target.getElement().click();
+      });
     }
   }
 

@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS Categories (
   Category_ID INTEGER PRIMARY KEY AUTOINCREMENT,
   Name        TEXT    NOT NULL,
   Type        TEXT    DEFAULT 'Expense',
+  Notes       TEXT,
   Active      INTEGER DEFAULT 1
 );
 

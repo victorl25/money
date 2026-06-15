@@ -30,6 +30,7 @@ const DB = (() => {
     )`);
     try { _db.run('ALTER TABLE Mappings ADD COLUMN Negate INTEGER DEFAULT 0'); } catch {} // no-op if already present
     try { _db.run("ALTER TABLE Categories ADD COLUMN Type TEXT DEFAULT 'Expense'"); } catch {}
+    try { _db.run('ALTER TABLE Categories ADD COLUMN Notes TEXT'); } catch {}
   }
 
   function exportBytes() {

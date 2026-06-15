@@ -9,12 +9,12 @@ const CategoriesTab = (() => {
 
   function loadData() {
     return DB.query(`
-      SELECT c.Category_ID, c.Name, c.Type,
+      SELECT c.Category_ID, c.Name, c.Type, c.Notes,
              MAX(t.Date) AS Last_Transaction
       FROM Categories c
       LEFT JOIN Transactions t ON t.Category_ID = c.Category_ID AND t.Valid = 1
       WHERE c.Active = 1
-      GROUP BY c.Category_ID, c.Name, c.Type
+      GROUP BY c.Category_ID, c.Name, c.Type, c.Notes
       ORDER BY c.Name`
     );
   }
@@ -30,6 +30,7 @@ const CategoriesTab = (() => {
     form.innerHTML = `
       <div class="form-col">
         <div class="form-field"><label>Name</label><input type="text" id="fc-name" class="form-control"></div>
+        <div class="form-field"><label>Notes</label><input type="text" id="fc-notes" class="form-control"></div>
       </div>
       <div class="form-col">
         <div class="form-field">
@@ -47,13 +48,15 @@ const CategoriesTab = (() => {
         <button id="fc-accept" class="btn btn-primary hidden">Accept</button>
       </div>`;
 
-    document.getElementById('fc-name').addEventListener('input', () => setDirty(true));
+    document.getElementById('fc-name').addEventListener('input',  () => setDirty(true));
+    document.getElementById('fc-notes').addEventListener('input', () => setDirty(true));
     document.getElementById('fc-type').addEventListener('change', () => setDirty(true));
 
     document.getElementById('fc-new').addEventListener('click', () => {
       _isNewMode = true; _selectedRow = null;
-      document.getElementById('fc-name').value = '';
-      document.getElementById('fc-type').value = 'Expense';
+      document.getElementById('fc-name').value  = '';
+      document.getElementById('fc-notes').value = '';
+      document.getElementById('fc-type').value  = 'Expense';
       setDirty(false);
       document.getElementById('fc-accept').classList.remove('hidden');
     });
@@ -68,18 +71,27 @@ const CategoriesTab = (() => {
   }
 
   async function commit() {
-    const name = document.getElementById('fc-name').value.trim();
+    const name  = document.getElementById('fc-name').value.trim();
     if (!name) { await Dialogs.alert('Validation', 'Name is required.'); return; }
-    const type = document.getElementById('fc-type').value;
+    const type  = document.getElementById('fc-type').value;
+    const notes = document.getElementById('fc-notes').value.trim() || null;
 
+    const editedId = (!_isNewMode && _selectedRow) ? _selectedRow.Category_ID : null;
     if (_isNewMode) {
-      DB.run('INSERT INTO Categories (Name, Type, Active) VALUES (?, ?, 1)', [name, type]);
+      DB.run('INSERT INTO Categories (Name, Type, Notes, Active) VALUES (?, ?, ?, 1)', [name, type, notes]);
     } else if (_selectedRow) {
-      DB.run('UPDATE Categories SET Name = ?, Type = ? WHERE Category_ID = ?', [name, type, _selectedRow.Category_ID]);
+      DB.run('UPDATE Categories SET Name = ?, Type = ?, Notes = ? WHERE Category_ID = ?', [name, type, notes, _selectedRow.Category_ID]);
     }
     _isNewMode = false;
     setDirty(false);
-    refresh();
+    if (editedId) {
+      _table.setData(loadData()).then(() => {
+        const row = _table.getRows('active').find(r => r.getData().Category_ID === editedId);
+        if (row) { _selectedRow = row.getData(); row.select(); _table.scrollToRow(row, 'center', false).catch(() => {}); }
+      });
+    } else {
+      refresh();
+    }
   }
 
   function build(panel) {
@@ -101,9 +113,10 @@ const CategoriesTab = (() => {
       selectableRows: 1,
       headerSortTristate: true,
       columns: [
-        { title: 'Name',             field: 'Name',             widthGrow: 2, formatter: nameFormatter, headerFilter: 'input' },
-        { title: 'Type',             field: 'Type',             width: 100 },
-        { title: 'Last Transaction', field: 'Last_Transaction', width: 160 }
+        { title: 'Name',             field: 'Name',             widthGrow: 2, formatter: nameFormatter, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Notes',            field: 'Notes',            widthGrow: 3, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Type',             field: 'Type',             width: 100, headerSortTristate: true },
+        { title: 'Last Transaction', field: 'Last_Transaction', width: 160, headerSortTristate: true }
       ]
     });
 
@@ -117,8 +130,9 @@ const CategoriesTab = (() => {
       if (_formDirty) setDirty(false);
       _selectedRow = row.getData();
       _isNewMode   = false;
-      document.getElementById('fc-name').value = _selectedRow.Name || '';
-      document.getElementById('fc-type').value = _selectedRow.Type || 'Expense';
+      document.getElementById('fc-name').value  = _selectedRow.Name  || '';
+      document.getElementById('fc-notes').value = _selectedRow.Notes || '';
+      document.getElementById('fc-type').value  = _selectedRow.Type  || 'Expense';
       setDirty(false);
     });
   }
@@ -147,11 +161,19 @@ const CategoriesTab = (() => {
     const ok = await Dialogs.confirm('Delete Category',
       `Set category "${_selectedRow.Name}" as inactive?`);
     if (ok) {
+      const pos = _table.getRows('active').findIndex(r => r.getData().Category_ID === id);
       DB.run('UPDATE Categories SET Active = 0 WHERE Category_ID = ?', [id]);
       _selectedRow = null;
-      if (document.getElementById('fc-name')) document.getElementById('fc-name').value = '';
+      if (document.getElementById('fc-name'))  document.getElementById('fc-name').value  = '';
+      if (document.getElementById('fc-notes')) document.getElementById('fc-notes').value = '';
       setDirty(false);
-      refresh();
+      _table.setData(loadData()).then(() => {
+        const newRows = _table.getRows('active');
+        if (!newRows.length) return;
+        const target = newRows[Math.min(Math.max(pos, 0), newRows.length - 1)];
+        _table.scrollToRow(target, 'center', false).catch(() => {});
+        target.getElement().click();
+      });
     }
   }
 

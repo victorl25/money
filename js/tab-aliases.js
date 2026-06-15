@@ -149,6 +149,7 @@ const AliasesTab = (() => {
       App.onPayeesChanged();
     }
 
+    const editedId = (!_isNewMode && _selectedRow) ? _selectedRow.Alias_ID : null;
     if (_isNewMode) {
       DB.run('INSERT INTO Aliases (Payee_ID, Alias, Active) VALUES (?,?,1)', [payeeId, alias]);
     } else if (_selectedRow) {
@@ -157,7 +158,14 @@ const AliasesTab = (() => {
     }
     _isNewMode = false;
     setDirty(false);
-    refresh();
+    if (editedId) {
+      _table.setData(loadData()).then(() => {
+        const row = _table.getRows('active').find(r => r.getData().Alias_ID === editedId);
+        if (row) { _selectedRow = row.getData(); row.select(); _table.scrollToRow(row, 'center', false).catch(() => {}); }
+      });
+    } else {
+      refresh();
+    }
   }
 
   function build(panel) {
@@ -179,8 +187,8 @@ const AliasesTab = (() => {
       selectableRows: 1,
       headerSortTristate: true,
       columns: [
-        { title: 'Alias',      field: 'Alias',      widthGrow: 2, headerFilter: 'input' },
-        { title: 'Payee Name', field: 'Payee_Name', widthGrow: 1, formatter: payeeNameFormatter, headerFilter: 'input' }
+        { title: 'Alias',      field: 'Alias',      widthGrow: 2, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Payee Name', field: 'Payee_Name', widthGrow: 1, formatter: payeeNameFormatter, headerFilter: 'input', headerSortTristate: true }
       ]
     });
 
@@ -213,14 +221,22 @@ const AliasesTab = (() => {
     const ok = await Dialogs.confirm('Delete Alias',
       `Set alias "${_selectedRow.Alias}" as inactive?`);
     if (ok) {
-      DB.run('UPDATE Aliases SET Active = 0 WHERE Alias_ID = ?', [_selectedRow.Alias_ID]);
+      const aliasId = _selectedRow.Alias_ID;
+      const pos     = _table.getRows('active').findIndex(r => r.getData().Alias_ID === aliasId);
+      DB.run('UPDATE Aliases SET Active = 0 WHERE Alias_ID = ?', [aliasId]);
       _selectedRow = null;
-      ['fa-alias','fa-payee','fa-payee-id'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+      ['fa-alias','fa-payee','fa-payee-id'].forEach(fId => {
+        const el = document.getElementById(fId); if (el) el.value = '';
       });
       setDirty(false);
       document.getElementById('fa-convert').classList.add('hidden');
-      refresh();
+      _table.setData(loadData()).then(() => {
+        const newRows = _table.getRows('active');
+        if (!newRows.length) return;
+        const target = newRows[Math.min(Math.max(pos, 0), newRows.length - 1)];
+        _table.scrollToRow(target, 'center', false).catch(() => {});
+        target.getElement().click();
+      });
     }
   }
 

@@ -237,10 +237,19 @@ const Import = (() => {
    * given accountId.  Handles payee lookup / creation and duplicate detection.
    * Returns the number of records inserted.
    */
-  function insertTransactions(txRows, accountId) {
+  function insertTransactions(txRows, accountId, ignoreKnown = false) {
     let count = 0;
     for (const t of txRows) {
       if (!t.Date || isNaN(t.Amount)) continue;
+
+      // Skip if already recorded (same Reference_ID + Account_ID already valid in DB)
+      if (ignoreKnown && t.Reference_ID) {
+        const exists = DB.queryOne(
+          'SELECT 1 FROM Transactions WHERE Reference_ID = ? AND Account_ID = ? AND Valid = 1 LIMIT 1',
+          [t.Reference_ID, accountId]
+        );
+        if (exists) continue;
+      }
 
       // Payee resolution
       let payeeId = DB.lookupPayee(t.PayeeName);
@@ -305,7 +314,7 @@ const Import = (() => {
     const name = file.name.toLowerCase();
 
     // Detect format
-    let rawTransactions, accountId;
+    let rawTransactions, accountId, ignoreKnown = false;
     const accounts = DB.query('SELECT Account_ID, Name, Type, Reference_ID FROM Accounts WHERE Active = 1');
 
     if (name.endsWith('.csv')) {
@@ -334,8 +343,10 @@ const Import = (() => {
         }
       }
 
-      accountId = await Dialogs.selectAccount('Select Account', accounts);
-      if (accountId == null) return;
+      const csvAcct = await Dialogs.selectAccount('Select Account', accounts, undefined, { showIgnoreKnown: true });
+      if (csvAcct == null) return;
+      accountId   = csvAcct.accountId;
+      ignoreKnown = csvAcct.ignoreKnown;
 
       rawTransactions = csvToTransactionsWithMappings(rows, userMappings);
 
@@ -343,8 +354,9 @@ const Import = (() => {
       const parsed    = parseOFX(text);
       rawTransactions = parsed.transactions;
       const matched   = matchOFXAccount(parsed.acctId);
-      const result    = await Dialogs.confirmAccount(matched, accounts);
+      const result    = await Dialogs.confirmAccount(matched, accounts, { showIgnoreKnown: true });
       if (result == null) return;
+      ignoreKnown = result.ignoreKnown;
       if (result.create) {
         const newName = parsed.org || parsed.acctId || 'Imported Account';
         DB.run(
@@ -363,8 +375,10 @@ const Import = (() => {
         await Dialogs.alert('No Accounts', 'Please create at least one account before importing.');
         return;
       }
-      accountId = await Dialogs.selectAccount('Select Account', accounts);
-      if (accountId == null) return;
+      const qifAcct = await Dialogs.selectAccount('Select Account', accounts, undefined, { showIgnoreKnown: true });
+      if (qifAcct == null) return;
+      accountId   = qifAcct.accountId;
+      ignoreKnown = qifAcct.ignoreKnown;
       rawTransactions = parseQIF(text);
 
     } else {
@@ -377,7 +391,7 @@ const Import = (() => {
       return;
     }
 
-    const count = insertTransactions(rawTransactions, accountId);
+    const count = insertTransactions(rawTransactions, accountId, ignoreKnown);
 
     // Update account balance (full recalc after import)
     DB.recalcAccountBalance(accountId, null);

@@ -43,8 +43,21 @@ const Dialogs = (() => {
             <button id="dlg-no"  class="btn btn-secondary">No</button>
           </div>
         </div>`);
-      document.getElementById('dlg-yes').onclick = () => { _hide(); resolve(true); };
-      document.getElementById('dlg-no').onclick  = () => { _hide(); resolve(false); };
+      const yesBtn = document.getElementById('dlg-yes');
+      const noBtn  = document.getElementById('dlg-no');
+
+      const done = result => { document.removeEventListener('keydown', onKey); _hide(); resolve(result); };
+      yesBtn.onclick = () => done(true);
+      noBtn.onclick  = () => done(false);
+
+      const onKey = e => {
+        if      (e.key === 'y' || e.key === 'Y') { e.preventDefault(); done(true); }
+        else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); done(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); done(document.activeElement === noBtn ? false : true); }
+        else if (e.key === 'Tab')   { e.preventDefault(); (document.activeElement === yesBtn ? noBtn : yesBtn).focus(); }
+      };
+      document.addEventListener('keydown', onKey);
+      yesBtn.focus();
     });
   }
 
@@ -73,17 +86,28 @@ const Dialogs = (() => {
     });
   }
 
-  /** Account selector.  accounts = [{Account_ID, Name, Type}].  Resolves with Account_ID or null. */
-  function selectAccount(title, accounts, message) {
+  /**
+   * Account selector.  accounts = [{Account_ID, Name, Type}].
+   * opts.showIgnoreKnown = true adds an "Ignore known transactions" checkbox.
+   * Without the option resolves with Account_ID or null.
+   * With the option resolves with {accountId, ignoreKnown} or null.
+   */
+  function selectAccount(title, accounts, message, opts = {}) {
     return new Promise(resolve => {
-      const opts = accounts.map(a =>
+      const acctOpts = accounts.map(a =>
         `<option value="${a.Account_ID}">${a.Name} (${a.Type})</option>`).join('');
+      const ignoreHtml = opts.showIgnoreKnown
+        ? `<label class="dlg-checkbox-label">
+             <input type="checkbox" id="dlg-ignore-known"> Ignore known transactions
+           </label>`
+        : '';
       _show(`
         <div class="dlg">
           <div class="dlg-title">${title}</div>
           <div class="dlg-body">
             <p>${message || 'Select the account for this import:'}</p>
-            <select id="dlg-acct" class="dlg-select">${opts}</select>
+            <select id="dlg-acct" class="dlg-select">${acctOpts}</select>
+            ${ignoreHtml}
           </div>
           <div class="dlg-footer">
             <button id="dlg-ok"     class="btn btn-primary">OK</button>
@@ -91,8 +115,12 @@ const Dialogs = (() => {
           </div>
         </div>`);
       document.getElementById('dlg-ok').onclick = () => {
-        const v = parseInt(document.getElementById('dlg-acct').value, 10);
-        _hide(); resolve(v);
+        const accountId    = parseInt(document.getElementById('dlg-acct').value, 10);
+        const ignoreKnown  = opts.showIgnoreKnown
+          ? document.getElementById('dlg-ignore-known').checked
+          : false;
+        _hide();
+        resolve(opts.showIgnoreKnown ? { accountId, ignoreKnown } : accountId);
       };
       document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
     });
@@ -101,26 +129,33 @@ const Dialogs = (() => {
   /**
    * Confirm an auto-matched account, or let the user pick a different one or create a new one.
    * matchedAccount may be null (no match found).
-   * Resolves with { accountId: <number> } | { create: true } | null (cancelled).
+   * opts.showIgnoreKnown = true adds an "Ignore known transactions" checkbox.
+   * Resolves with { accountId, ignoreKnown? } | { create: true, ignoreKnown? } | null (cancelled).
    */
-  function confirmAccount(matchedAccount, accounts) {
+  function confirmAccount(matchedAccount, accounts, opts = {}) {
     return new Promise(resolve => {
       const hasAccounts = accounts.length > 0;
-      const opts = accounts.map(a =>
+      const acctOpts = accounts.map(a =>
         `<option value="${a.Account_ID}" ${matchedAccount && a.Account_ID === matchedAccount.Account_ID ? 'selected' : ''}>${a.Name} (${a.Type})</option>`
       ).join('');
       const msg = matchedAccount
         ? `The file was matched to account <strong>${matchedAccount.Name}</strong>. Confirm, choose a different account, or create a new one:`
         : 'No matching account was found. Select an existing account or create a new one:';
       const selectHtml = hasAccounts
-        ? `<select id="dlg-acct" class="dlg-select">${opts}</select>`
+        ? `<select id="dlg-acct" class="dlg-select">${acctOpts}</select>`
         : `<p style="color:#999;font-style:italic;margin-top:6px">No existing accounts — use Create New Account.</p>`;
+      const ignoreHtml = opts.showIgnoreKnown
+        ? `<label class="dlg-checkbox-label">
+             <input type="checkbox" id="dlg-ignore-known"> Ignore known transactions
+           </label>`
+        : '';
       _show(`
         <div class="dlg">
           <div class="dlg-title">Confirm Account</div>
           <div class="dlg-body">
             <p>${msg}</p>
             ${selectHtml}
+            ${ignoreHtml}
           </div>
           <div class="dlg-footer">
             ${hasAccounts ? '<button id="dlg-ok" class="btn btn-primary">Use Selected</button>' : ''}
@@ -128,13 +163,17 @@ const Dialogs = (() => {
             <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
           </div>
         </div>`);
+      const getIgnore = () => opts.showIgnoreKnown
+        ? document.getElementById('dlg-ignore-known').checked
+        : false;
       if (hasAccounts) {
         document.getElementById('dlg-ok').onclick = () => {
-          const v = parseInt(document.getElementById('dlg-acct').value, 10);
-          _hide(); resolve({ accountId: v });
+          const accountId    = parseInt(document.getElementById('dlg-acct').value, 10);
+          const ignoreKnown  = getIgnore();
+          _hide(); resolve({ accountId, ignoreKnown });
         };
       }
-      document.getElementById('dlg-create').onclick = () => { _hide(); resolve({ create: true }); };
+      document.getElementById('dlg-create').onclick = () => { const ignoreKnown = getIgnore(); _hide(); resolve({ create: true, ignoreKnown }); };
       document.getElementById('dlg-cancel').onclick  = () => { _hide(); resolve(null); };
     });
   }
@@ -347,5 +386,136 @@ const Dialogs = (() => {
     });
   }
 
-  return { alert, confirm, prompt, selectAccount, confirmAccount, selectDbFile, mergePopup, selectPattern, csvColumnMapper };
+  /**
+   * Assign-category dialog: pick a payee and a target category.
+   * payees     = [{Payee_ID, Name}]
+   * categories = [{Category_ID, Name, Type}]
+   * Resolves with {payeeId, categoryId} or null on cancel.
+   */
+  function selectPayeeAndCategory(payees, categories) {
+    return new Promise(resolve => {
+      const payeeOpts = payees.map(p =>
+        `<option value="${p.Payee_ID}">${p.Name}</option>`).join('');
+      const catOpts = categories.map(c =>
+        `<option value="${c.Category_ID}">${c.Name} (${c.Type})</option>`).join('');
+      _show(`
+        <div class="dlg dlg-wide">
+          <div class="dlg-title">Assign Category</div>
+          <div class="dlg-body">
+            <p>Select a payee and the category to assign to all their transactions visible in the active tab:</p>
+            <div class="form-field" style="margin-bottom:10px">
+              <label>Payee</label>
+              <select id="dlg-payee" class="dlg-select">${payeeOpts}</select>
+            </div>
+            <div class="form-field">
+              <label>Category</label>
+              <select id="dlg-cat" class="dlg-select">${catOpts}</select>
+            </div>
+          </div>
+          <div class="dlg-footer">
+            <button id="dlg-ok"     class="btn btn-primary">Assign</button>
+            <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>`);
+      document.getElementById('dlg-ok').onclick = () => {
+        const payeeId    = parseInt(document.getElementById('dlg-payee').value, 10);
+        const categoryId = parseInt(document.getElementById('dlg-cat').value, 10);
+        _hide(); resolve({ payeeId, categoryId });
+      };
+      document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
+    });
+  }
+
+  /**
+   * Merge payees dialog: pick a From payee and a To payee.
+   * payees = [{Payee_ID, Name}]
+   * Resolves with {fromId, toId} or null on cancel.
+   */
+  function selectMergePayees(payees) {
+    return new Promise(resolve => {
+      const opts = payees.map(p =>
+        `<option value="${p.Payee_ID}">${p.Name}</option>`).join('');
+      _show(`
+        <div class="dlg dlg-wide">
+          <div class="dlg-title">Merge Payees</div>
+          <div class="dlg-body">
+            <p>All transactions from the <strong>From</strong> payee will be reassigned to the <strong>To</strong> payee.</p>
+            <div class="form-field" style="margin-bottom:10px">
+              <label>From (source payee)</label>
+              <select id="dlg-from" class="dlg-select">${opts}</select>
+            </div>
+            <div class="form-field">
+              <label>To (target payee)</label>
+              <select id="dlg-to" class="dlg-select">${opts}</select>
+            </div>
+            <div id="dlg-merge-err" style="color:#c0392b;font-size:12px;margin-top:8px;min-height:16px"></div>
+          </div>
+          <div class="dlg-footer">
+            <button id="dlg-ok"     class="btn btn-primary">Merge</button>
+            <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>`);
+      document.getElementById('dlg-ok').onclick = () => {
+        const fromId = parseInt(document.getElementById('dlg-from').value, 10);
+        const toId   = parseInt(document.getElementById('dlg-to').value, 10);
+        if (fromId === toId) {
+          document.getElementById('dlg-merge-err').textContent = 'From and To payees must be different.';
+          return;
+        }
+        _hide(); resolve({ fromId, toId });
+      };
+      document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
+    });
+  }
+
+  /**
+   * Time-frame selector for reports.
+   * Resolves with 'ytd' | 'prev' | 'all' or null on cancel.
+   */
+  function selectTimeframe() {
+    return new Promise(resolve => {
+      _show(`
+        <div class="dlg">
+          <div class="dlg-title">Select Time Frame</div>
+          <div class="dlg-body">
+            <p>Select the period to include in the report:</p>
+            <select id="dlg-tf" class="dlg-select">
+              <option value="ytd">Year to date</option>
+              <option value="prev">Previous year</option>
+              <option value="all">All time</option>
+            </select>
+          </div>
+          <div class="dlg-footer">
+            <button id="dlg-ok"     class="btn btn-primary">OK</button>
+            <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>`);
+      document.getElementById('dlg-ok').onclick     = () => { const v = document.getElementById('dlg-tf').value; _hide(); resolve(v); };
+      document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
+    });
+  }
+
+  /**
+   * Three-choice dialog: Single / All / Cancel.
+   * Resolves with 'single', 'all', or null (cancel).
+   */
+  function confirmSingleAll(title, message) {
+    return new Promise(resolve => {
+      _show(`
+        <div class="dlg">
+          <div class="dlg-title">${title}</div>
+          <div class="dlg-body">${message}</div>
+          <div class="dlg-footer">
+            <button id="dlg-single" class="btn btn-primary">Single</button>
+            <button id="dlg-all"    class="btn btn-secondary">All</button>
+            <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
+          </div>
+        </div>`);
+      document.getElementById('dlg-single').onclick = () => { _hide(); resolve('single'); };
+      document.getElementById('dlg-all').onclick    = () => { _hide(); resolve('all'); };
+      document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
+    });
+  }
+
+  return { alert, confirm, confirmSingleAll, prompt, selectTimeframe, selectMergePayees, selectAccount, confirmAccount, selectDbFile, mergePopup, selectPattern, csvColumnMapper, selectPayeeAndCategory };
 })();

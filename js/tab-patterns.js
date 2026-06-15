@@ -154,8 +154,8 @@ const PatternsTab = (() => {
       selectableRows: 1,
       headerSortTristate: true,
       columns: [
-        { title: 'Pattern',    field: 'Pattern',    widthGrow: 2, headerFilter: 'input' },
-        { title: 'Payee Name', field: 'Payee_Name', widthGrow: 1, formatter: payeeNameFormatter, headerFilter: 'input' }
+        { title: 'Pattern',    field: 'Pattern',    widthGrow: 2, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Payee Name', field: 'Payee_Name', widthGrow: 1, formatter: payeeNameFormatter, headerFilter: 'input', headerSortTristate: true }
       ]
     });
 
@@ -191,13 +191,21 @@ const PatternsTab = (() => {
     const ok = await Dialogs.confirm('Delete Pattern',
       `Set pattern "${_selectedRow.Pattern}" as inactive?`);
     if (ok) {
-      DB.run('UPDATE Patterns SET Active = 0 WHERE Pattern_ID = ?', [_selectedRow.Pattern_ID]);
+      const patternId = _selectedRow.Pattern_ID;
+      const pos       = _table.getRows('active').findIndex(r => r.getData().Pattern_ID === patternId);
+      DB.run('UPDATE Patterns SET Active = 0 WHERE Pattern_ID = ?', [patternId]);
       _selectedRow = null;
-      ['fpt-pattern', 'fpt-payee', 'fpt-payee-id'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
+      ['fpt-pattern', 'fpt-payee', 'fpt-payee-id'].forEach(fId => {
+        const el = document.getElementById(fId); if (el) el.value = '';
       });
       setDirty(false);
-      refresh();
+      _table.setData(loadData()).then(() => {
+        const newRows = _table.getRows('active');
+        if (!newRows.length) return;
+        const target = newRows[Math.min(Math.max(pos, 0), newRows.length - 1)];
+        _table.scrollToRow(target, 'center', false).catch(() => {});
+        target.getElement().click();
+      });
     }
   }
 

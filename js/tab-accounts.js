@@ -165,11 +165,11 @@ const AccountsTab = (() => {
       selectableRows: 1,
       headerSortTristate: true,
       columns: [
-        { title: 'Name',         field: 'Name',         widthGrow: 2, formatter: nameFormatter, headerFilter: 'input' },
-        { title: 'Type',         field: 'Type',         width: 130,   headerFilter: 'input' },
-        { title: 'Balance',      field: 'Balance',      width: 130,   formatter: currencyFormatter, hozAlign: 'right' },
-        { title: 'Last Transaction', field: 'Last_Transaction', width: 160 },
-        { title: 'To Review', field: 'To_Review', width: 100, hozAlign: 'right' }
+        { title: 'Name',         field: 'Name',         widthGrow: 2, formatter: nameFormatter, headerFilter: 'input', headerSortTristate: true },
+        { title: 'Type',         field: 'Type',         width: 130,   headerFilter: 'input', headerSortTristate: true },
+        { title: 'Balance',      field: 'Balance',      width: 130,   formatter: currencyFormatter, hozAlign: 'right', headerSortTristate: true },
+        { title: 'Last Transaction', field: 'Last_Transaction', width: 160, headerSortTristate: true },
+        { title: 'To Review', field: 'To_Review', width: 100, hozAlign: 'right', headerSortTristate: true }
       ]
     });
 
@@ -212,11 +212,18 @@ const AccountsTab = (() => {
     const ok = await Dialogs.confirm('Delete Account',
       `Set account "${_selectedRow.Name}" as inactive?`);
     if (ok) {
+      const pos = _table.getRows('active').findIndex(r => r.getData().Account_ID === id);
       DB.run('UPDATE Accounts SET Active = 0 WHERE Account_ID = ?', [id]);
       _selectedRow = null;
       clearForm();
       setDirty(false);
-      refresh();
+      _table.setData(loadData()).then(() => {
+        const newRows = _table.getRows('active');
+        if (!newRows.length) return;
+        const target = newRows[Math.min(Math.max(pos, 0), newRows.length - 1)];
+        _table.scrollToRow(target, 'center', false).catch(() => {});
+        target.getElement().click();
+      });
     }
   }
 
