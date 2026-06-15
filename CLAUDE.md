@@ -10,14 +10,18 @@ A single-page application for tracking credit card and bank transactions. Runs e
 
 ### Runtime Environment
 
-- **Browser**: Chromium 148 (located in `chrome/148.0.7778.179/`)
-- **Launch**: `money.bat` starts Chromium with required flags and opens `index.html`
+- **Browser**: Chromium (standalone, bundled under `chrome/`)
+  - Windows: `chrome/148.0.7778.179/chrome.exe` (pre-installed)
+  - macOS: `chrome/mac/Chromium.app` (auto-downloaded by `money.sh` on first run from the Chromium snapshot CDN; architecture-detected — `Mac_Arm` for Apple Silicon, `Mac` for Intel)
+- **Launch**: `money.bat` (Windows) / `money.sh` (macOS) starts Chromium with required flags and opens `index.html`
 - **Protocol**: `file://` (no local server)
 
 **Required Chromium launch flags:**
 ```
 --allow-file-access-from-files
 --enable-features=FileSystemAccessAPI
+--user-data-dir=<appDir>/chrome/profile   (macOS only — keeps profile local; Windows uses bundled Chromium's own profile)
+--no-first-run                            (macOS only)
 ```
 
 ### File Structure
@@ -26,9 +30,12 @@ A single-page application for tracking credit card and bank transactions. Runs e
 Money/
 ├── CLAUDE.md               # This file
 ├── index.html              # Single entry point (HTML + CSS + JS)
-├── money.bat               # Launches Chromium with correct flags
-└── chrome/                 # Bundled Chromium install
-    └── 148.0.7778.179/
+├── money.bat               # Launches Chromium on Windows
+├── money.sh                # Launches Chromium on macOS (downloads Chromium on first run)
+└── chrome/                 # Chromium installs (gitignored)
+    ├── 148.0.7778.179/     # Windows Chromium (pre-installed)
+    ├── mac/                # macOS Chromium (auto-downloaded by money.sh)
+    └── profile/            # macOS Chromium user-data-dir
 └── lib/
     ├── sql-wasm.js         # sql.js library (local copy, no CDN)
     ├── sql-wasm.wasm       # SQLite WASM binary (local copy)
@@ -86,14 +93,14 @@ The meaningful WASM component is `sql.js` (SQLite engine). All other application
 
 ## Application Startup Flow
 
-1. `money.bat` accepts an optional first command-line argument as a DATA_DIR override (default: `<appDir>\data`). Creates DATA_DIR if absent, scans it for `.db` files, finds the most recent by filename (descending sort — filenames are timestamped so alphabetical order equals chronological order), then launches Chromium with `?dataDir=<forwardSlashPath>&db=<filename>` appended to the URL. Spaces in DATA_DIR are encoded as `%20`.
-2. `app.js` reads both URL parameters. `_dataDirUrl` is set to `file:///{dataDir}` when `?dataDir=` is present, or falls back to `{pageDir}data` when opening `index.html` directly. The DB is fetched from `${_dataDirUrl}/${dbFile}`.
+1. `money.bat` (Windows) / `money.sh` (macOS) accept an optional first argument as a DATA_DIR override (default: `<appDir>/data`). Create DATA_DIR if absent, scan it for `.db` files, find the most recent by filename (descending sort — filenames are timestamped so alphabetical order equals chronological order), then launch Chromium with `?dataDir=<forwardSlashPath>&db=<filename>` appended to the URL. Spaces in DATA_DIR are encoded as `%20`. On macOS, `money.sh` also strips the leading `/` from the DATA_DIR path before passing it as a URL parameter (see note 2 below).
+2. `app.js` reads both URL parameters. `_dataDirUrl` is set to `file:///{dataDir}` when `?dataDir=` is present, or falls back to `{pageDir}data` when opening `index.html` directly. The DB is fetched from `${_dataDirUrl}/${dbFile}`. **Platform note**: Windows paths (`C:/foo`) have no leading slash, so `file:///C:/foo` is correct. macOS paths (`/Users/…`) would produce a 4-slash URL (`file:////Users/…`) if passed verbatim — `money.sh` strips the leading `/` so the template produces the correct `file:///Users/…`.
 3. `_lastFileHandle` is loaded from IndexedDB (`MoneyApp` database, `handles` store, key `'dbFile'`) at startup so the Save/Open dialogs open in the correct folder across Chromium restarts.
 4. If a file is found and loads successfully → `DB.loadFromBytes()`. If `_lastFileHandle` is still null after the IDB load, `showOpenFilePicker` is attempted (with `id: 'money-db'`) to acquire a handle for the auto-loaded file; on success the handle is persisted to IDB. This is a one-time step per fresh Chromium profile.
 5. If no parameter or fetch fails → `DB.createNew()` (empty database with default Categories record).
 6. Accounts tab opens immediately — no welcome screen or folder picker.
 
-Data folder: configurable via `money.bat` first argument; defaults to `Money/data/` (created automatically by `money.bat`).
+Data folder: configurable via first argument to `money.bat` / `money.sh`; defaults to `Money/data/` (created automatically by the launcher).
 
 ---
 

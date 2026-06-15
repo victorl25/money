@@ -571,10 +571,10 @@ const App = (() => {
     wireMenu();
     wireTabBar();
 
-    // Read URL parameters passed by launch.bat
+    // Read URL parameters passed by the launcher (money.bat / money.sh)
     const params  = new URLSearchParams(window.location.search);
     const dbFile  = params.get('db');
-    const dataDirParam = params.get('dataDir'); // forward-slash path from launch.bat
+    const dataDirParam = params.get('dataDir'); // forward-slash path from the launcher
 
     // Build the data directory file:// URL (used for the initial DB fetch)
     if (dataDirParam) {

@@ -1,6 +1,6 @@
 # Money Tracker
 
-A personal finance application for reviewing, categorising, and reporting on credit card and bank transactions. Runs entirely offline — no server, no cloud, no installation. The application is inspired by the venerable Microsoft Money app.
+A personal finance application for reviewing, categorising, and reporting on credit card and bank transactions. Runs entirely offline — no server, no cloud, no installation. The application is inspired by the venerable Microsoft Money app https://en.wikipedia.org/wiki/Microsoft_Money. 
 
 ---
 
@@ -17,6 +17,7 @@ A personal finance application for reviewing, categorising, and reporting on cre
 ## Getting Started
 
 Download a standalone version of Chromium, unpack and place it into the `chrome\` folder. The application expects `chrome\chrome.exe`.
+Windows version download is available here: https://github.com/Hibbiki/chromium-win64, MacOS version download is available here: https://chromium.woolyss.com/download/#mac-arm. On MacOS use `xattr -cr /Applications/Chromium.app` to prevent system errors when launching the Chromium app.
 
 Double-click **`money.bat`** to launch the application. On first run it creates a `data\` folder next to the batch file and opens an empty database. Use **File › Save** to give it a name. If you prefer a different location for the database files, provide the data folder location as a command line argument or edit `money.bat` to change the default value.
 
