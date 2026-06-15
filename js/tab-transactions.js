@@ -118,6 +118,7 @@ const TransactionsTab = (() => {
       if (onSelect) onSelect(parseInt(item.dataset.id, 10), item.dataset.name);
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
+    addAcKeyboard(inputEl, listEl);
   }
 
   function attachAccountAutocomplete(inputEl, hiddenEl, listEl) {
@@ -141,6 +142,7 @@ const TransactionsTab = (() => {
       listEl.innerHTML = '';
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
+    addAcKeyboard(inputEl, listEl);
   }
 
   function attachCategoryAutocomplete(inputEl, hiddenEl, listEl) {
@@ -164,6 +166,7 @@ const TransactionsTab = (() => {
       listEl.innerHTML = '';
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
+    addAcKeyboard(inputEl, listEl);
   }
 
   // ── Form handling ──────────────────────────────────────────────────────────
@@ -219,6 +222,7 @@ const TransactionsTab = (() => {
       </div>
       <div class="form-col-btns">
         <button id="${p}-new"      class="btn btn-secondary">New</button>
+        <button id="${p}-delete"   class="btn btn-danger hidden">Delete</button>
         <button id="${p}-merge"    class="btn btn-secondary">Merge</button>
         <button id="${p}-transfer" class="btn btn-secondary" disabled>Transfer</button>
         <div class="btn-spacer"></div>
@@ -260,6 +264,7 @@ const TransactionsTab = (() => {
       updateTransferBtn(inst);
     });
 
+    fld(inst, 'delete').addEventListener('click',   () => handleDelete(inst));
     fld(inst, 'accept').addEventListener('click',   () => handleFormAccept(inst));
     fld(inst, 'merge').addEventListener('click',    () => launchMerge(inst));
     fld(inst, 'transfer').addEventListener('click', () => handleTransfer(inst));
@@ -298,6 +303,7 @@ const TransactionsTab = (() => {
     // Restore Category to editable
     const catEl = fld(inst, 'category');
     if (catEl) { catEl.readOnly = false; catEl.classList.remove('form-readonly'); }
+    const delBtn = fld(inst, 'delete'); if (delBtn) delBtn.classList.add('hidden');
   }
 
   function populateTrnForm(inst, data) {
@@ -339,8 +345,22 @@ const TransactionsTab = (() => {
       catEl.classList.toggle('form-readonly', isTransfer);
     }
 
+    const delBtn = fld(inst, 'delete'); if (delBtn) delBtn.classList.remove('hidden');
     instSetDirty(inst, false);
     updateTransferBtn(inst);
+  }
+
+  /** Re-select a row by Transaction_ID after a setData refresh. */
+  function reselectRow(inst, trnId) {
+    if (!inst.table || !trnId) return;
+    const target = inst.table.getRows('active').find(r => r.getData().Transaction_ID === trnId);
+    if (!target) return;
+    inst.table.deselectRow();
+    target.select();
+    inst.selectedRow = target.getData();
+    populateTrnForm(inst, inst.selectedRow);
+    updateAcceptBtn(inst);
+    inst.table.scrollToRow(target, 'nearest', false).catch(() => {});
   }
 
   /**
@@ -351,18 +371,14 @@ const TransactionsTab = (() => {
   async function handleFormAccept(inst) {
     const savedRow   = inst.selectedRow;
     const willReview = savedRow && !savedRow.Reviewed;
+    const savedTrnId = savedRow ? savedRow.Transaction_ID : null;
 
     if (inst.formDirty) await commitTrn(inst);
 
-    // After commitTrn the row may have been refreshed; re-check using saved Transaction_ID
     if (willReview && savedRow) {
       DB.run('UPDATE Transactions SET Reviewed = 1 WHERE Transaction_ID = ?',
         [savedRow.Transaction_ID]);
-      refreshInstance(inst);
-      // Update inst.selectedRow to reflect new Reviewed state
-      if (inst.selectedRow && inst.selectedRow.Transaction_ID === savedRow.Transaction_ID) {
-        inst.selectedRow.Reviewed = 1;
-      }
+      refreshInstance(inst, savedTrnId ? () => reselectRow(inst, savedTrnId) : null);
       updateAcceptBtn(inst);
     }
   }
@@ -448,7 +464,7 @@ const TransactionsTab = (() => {
       inst.isNewMode   = false;
       inst.selectedRow = null;
       instSetDirty(inst, false);
-      refreshInstance(inst);
+      refreshInstance(inst, () => reselectRow(inst, trnId));
       App.onDataChanged(accountId);
       return;
     }
@@ -571,7 +587,7 @@ const TransactionsTab = (() => {
     inst.isNewMode   = false;
     inst.selectedRow = null;
     instSetDirty(inst, false);
-    refreshInstance(inst);
+    refreshInstance(inst, savedTrnId ? () => reselectRow(inst, savedTrnId) : null);
     App.onDataChanged(accountId);
   }
 

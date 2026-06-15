@@ -44,6 +44,7 @@ const CategoriesTab = (() => {
       </div>
       <div class="form-col-btns">
         <button id="fc-new"    class="btn btn-secondary">New</button>
+        <button id="fc-delete" class="btn btn-danger hidden">Delete</button>
         <div class="btn-spacer"></div>
         <button id="fc-accept" class="btn btn-primary hidden">Accept</button>
       </div>`;
@@ -57,10 +58,12 @@ const CategoriesTab = (() => {
       document.getElementById('fc-name').value  = '';
       document.getElementById('fc-notes').value = '';
       document.getElementById('fc-type').value  = 'Expense';
+      document.getElementById('fc-delete').classList.add('hidden');
       setDirty(false);
       document.getElementById('fc-accept').classList.remove('hidden');
     });
 
+    document.getElementById('fc-delete').addEventListener('click', handleDelete);
     document.getElementById('fc-accept').addEventListener('click', commit);
   }
 
@@ -133,6 +136,7 @@ const CategoriesTab = (() => {
       document.getElementById('fc-name').value  = _selectedRow.Name  || '';
       document.getElementById('fc-notes').value = _selectedRow.Notes || '';
       document.getElementById('fc-type').value  = _selectedRow.Type  || 'Expense';
+      document.getElementById('fc-delete').classList.remove('hidden');
       setDirty(false);
     });
   }
@@ -164,8 +168,9 @@ const CategoriesTab = (() => {
       const pos = _table.getRows('active').findIndex(r => r.getData().Category_ID === id);
       DB.run('UPDATE Categories SET Active = 0 WHERE Category_ID = ?', [id]);
       _selectedRow = null;
-      if (document.getElementById('fc-name'))  document.getElementById('fc-name').value  = '';
-      if (document.getElementById('fc-notes')) document.getElementById('fc-notes').value = '';
+      if (document.getElementById('fc-name'))   document.getElementById('fc-name').value  = '';
+      if (document.getElementById('fc-notes'))  document.getElementById('fc-notes').value = '';
+      if (document.getElementById('fc-delete')) document.getElementById('fc-delete').classList.add('hidden');
       setDirty(false);
       _table.setData(loadData()).then(() => {
         const newRows = _table.getRows('active');

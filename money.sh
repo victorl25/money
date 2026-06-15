@@ -1,40 +1,13 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CHROME_DIR="$SCRIPT_DIR/chrome/mac"
-CHROME_BIN="$CHROME_DIR/Chromium.app/Contents/MacOS/Chromium"
+CHROME_DIR="$SCRIPT_DIR/chrome"
+CHROME_BIN="$CHROME_DIR/Chromium/Contents/MacOS/Chromium"
 
 # Download standalone Chromium on first run
 if [ ! -x "$CHROME_BIN" ]; then
-  echo "Chromium not found in chrome/mac/. Downloading..."
-
-  ARCH=$(uname -m)
-  if [ "$ARCH" = "arm64" ]; then
-    PLATFORM="Mac_Arm"
-  else
-    PLATFORM="Mac"
-  fi
-
-  REVISION=$(curl -fsSL "https://commondatastorage.googleapis.com/chromium-browser-snapshots/${PLATFORM}/LAST_CHANGE") || {
-    echo "Error: Could not fetch Chromium revision. Check your internet connection." >&2
-    exit 1
-  }
-
-  echo "Downloading Chromium r${REVISION} for ${PLATFORM}..."
-  TMPZIP=$(mktemp "/tmp/chromium-XXXXXX.zip")
-  curl -fsSL --progress-bar \
-    "https://commondatastorage.googleapis.com/chromium-browser-snapshots/${PLATFORM}/${REVISION}/chrome-mac.zip" \
-    -o "$TMPZIP" || {
-    echo "Error: Download failed." >&2
-    rm -f "$TMPZIP"
-    exit 1
-  }
-
-  mkdir -p "$CHROME_DIR"
-  unzip -q "$TMPZIP" -d "$CHROME_DIR"
-  mv "$CHROME_DIR/chrome-mac/Chromium.app" "$CHROME_DIR/"
-  rm -rf "$CHROME_DIR/chrome-mac" "$TMPZIP"
-  echo "Chromium installed to chrome/mac/"
+  echo "Chromium not found in chrome/ folder, download Chromium to run the app."
+  exit 1
 fi
 
 # Accept optional first argument as DATA_DIR override; default to <appDir>/data

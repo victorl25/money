@@ -66,6 +66,7 @@ const AccountsTab = (() => {
       </div>
       <div class="form-col-btns">
         <button id="f-new"    class="btn btn-secondary">New</button>
+        <button id="f-delete" class="btn btn-danger hidden">Delete</button>
         <div class="btn-spacer"></div>
         <button id="f-accept" class="btn btn-primary hidden">Accept</button>
       </div>`;
@@ -83,6 +84,7 @@ const AccountsTab = (() => {
       document.getElementById('f-accept').classList.remove('hidden');
     });
 
+    document.getElementById('f-delete').addEventListener('click', handleDelete);
     document.getElementById('f-accept').addEventListener('click', commitAccount);
   }
 
@@ -99,6 +101,7 @@ const AccountsTab = (() => {
     document.getElementById('f-currency').value  = 'USD';
     document.getElementById('f-start-bal').value = '';
     document.getElementById('f-active').value    = '1';
+    const del = document.getElementById('f-delete'); if (del) del.classList.add('hidden');
   }
 
   function populateForm(data) {
@@ -186,6 +189,7 @@ const AccountsTab = (() => {
       // Load full row from DB for Starting_Balance etc.
       const full = DB.queryOne('SELECT * FROM Accounts WHERE Account_ID = ?', [_selectedRow.Account_ID]);
       populateForm(full || _selectedRow);
+      document.getElementById('f-delete').classList.remove('hidden');
     });
   }
 

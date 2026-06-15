@@ -45,6 +45,7 @@ const PatternsTab = (() => {
       listEl.innerHTML = '';
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
+    addAcKeyboard(inputEl, listEl);
   }
 
   // ── Form ───────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ const PatternsTab = (() => {
       </div>
       <div class="form-col-btns">
         <button id="fpt-new"    class="btn btn-secondary">New</button>
+        <button id="fpt-delete" class="btn btn-danger hidden">Delete</button>
         <div class="btn-spacer"></div>
         <button id="fpt-accept" class="btn btn-primary hidden">Accept</button>
       </div>`;
@@ -85,10 +87,12 @@ const PatternsTab = (() => {
       document.getElementById('fpt-pattern').value  = '';
       document.getElementById('fpt-payee').value    = '';
       document.getElementById('fpt-payee-id').value = '';
+      document.getElementById('fpt-delete').classList.add('hidden');
       setDirty(false);
       document.getElementById('fpt-accept').classList.remove('hidden');
     });
 
+    document.getElementById('fpt-delete').addEventListener('click', handleDelete);
     document.getElementById('fpt-accept').addEventListener('click', commit);
   }
 
@@ -172,6 +176,7 @@ const PatternsTab = (() => {
       document.getElementById('fpt-pattern').value  = _selectedRow.Pattern    || '';
       document.getElementById('fpt-payee').value    = _selectedRow.Payee_Name || '';
       document.getElementById('fpt-payee-id').value = String(_selectedRow.Payee_ID || '');
+      document.getElementById('fpt-delete').classList.remove('hidden');
       setDirty(false);
     });
   }
@@ -199,6 +204,7 @@ const PatternsTab = (() => {
         const el = document.getElementById(fId); if (el) el.value = '';
       });
       setDirty(false);
+      const delBtn = document.getElementById('fpt-delete'); if (delBtn) delBtn.classList.add('hidden');
       _table.setData(loadData()).then(() => {
         const newRows = _table.getRows('active');
         if (!newRows.length) return;

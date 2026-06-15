@@ -394,7 +394,8 @@ html, body {
   font-size: 13px;
 }
 
-.ac-item:hover { background: #f0f4ff; }
+.ac-item:hover  { background: #f0f4ff; }
+.ac-item.ac-active { background: #0078d7; color: #fff; }
 
 /* ── Action buttons in table ────────────────────────────────────────── */
 .act-btn {
@@ -714,7 +715,7 @@ a.cell-link:hover { text-decoration: underline; }
 
 .tabulator .tabulator-col-title { font-weight: 600; color: #444; }
 
-.tabulator .tabulator-row:hover { background: #b6cee6; }
+.tabulator .tabulator-row:hover { background: #d6e0e9; }
 .tabulator .tabulator-row.tabulator-selected { background: #b6cee6; }
 /*.tabulator .tabulator-row.tabulator-selected:hover   { background: transparent; }*/
 

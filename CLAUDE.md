@@ -10,9 +10,9 @@ A single-page application for tracking credit card and bank transactions. Runs e
 
 ### Runtime Environment
 
-- **Browser**: Chromium (standalone, bundled under `chrome/`)
-  - Windows: `chrome/148.0.7778.179/chrome.exe` (pre-installed)
-  - macOS: `chrome/mac/Chromium.app` (auto-downloaded by `money.sh` on first run from the Chromium snapshot CDN; architecture-detected — `Mac_Arm` for Apple Silicon, `Mac` for Intel)
+- **Browser**: Chromium (standalone, bundled under `chrome`)
+  - Windows: `chrome\chrome.exe` (manually downloaded by user)
+  - macOS: `chrome/Chromium` (manually downloaded by user)
 - **Launch**: `money.bat` (Windows) / `money.sh` (macOS) starts Chromium with required flags and opens `index.html`
 - **Protocol**: `file://` (no local server)
 
@@ -31,10 +31,10 @@ Money/
 ├── CLAUDE.md               # This file
 ├── index.html              # Single entry point (HTML + CSS + JS)
 ├── money.bat               # Launches Chromium on Windows
-├── money.sh                # Launches Chromium on macOS (downloads Chromium on first run)
+├── money.sh                # Launches Chromium on macOS 
 └── chrome/                 # Chromium installs (gitignored)
-    ├── 148.0.7778.179/     # Windows Chromium (pre-installed)
-    ├── mac/                # macOS Chromium (auto-downloaded by money.sh)
+    ├── 148.0.7778.179/     # Windows Chromium (as an example)
+    ├── Chromium/           # macOS Chromium 
     └── profile/            # macOS Chromium user-data-dir
 └── lib/
     ├── sql-wasm.js         # sql.js library (local copy, no CDN)

@@ -5,6 +5,7 @@ const App = (() => {
   let _lastFileHandle = null;        // FileSystemFileHandle from last open/save
   let _lastPrefix     = 'money';     // filename prefix for next save
   let _dataDirUrl     = null;        // file:// URL for DATA_DIR (from ?dataDir= param)
+  let _statusBase     = '';          // base status text without change counter
 
   function _extractPrefix(filename) {
     // Remove _YYYYMMDDHHMM.db suffix if present, then any remaining .db extension
@@ -99,8 +100,15 @@ const App = (() => {
 
   // ── Status bar ────────────────────────────────────────────────────────────────
 
+  function _renderStatus() {
+    const n = DB.getChangeCount();
+    document.getElementById('db-status').textContent =
+      n > 0 ? `${_statusBase} (+${n})` : _statusBase;
+  }
+
   function setStatus(text) {
-    document.getElementById('db-status').textContent = text;
+    _statusBase = text;
+    _renderStatus();
   }
 
   // ── Timestamp suffix for save filenames ───────────────────────────────────────
@@ -204,6 +212,7 @@ const App = (() => {
     _lastFileHandle = fh;
     _lastPrefix     = prefix;
     _saveHandleToIDB(fh);
+    DB.resetChangeCount();
     setStatus(fh.name);
     await Dialogs.alert('Saved', `Database saved as "${fh.name}".`);
   }
@@ -496,6 +505,21 @@ const App = (() => {
     else if (active.startsWith('trn-'))       TransactionsTab.handleDeleteKey(active);
   });
 
+  // Ctrl+Enter (Cmd+Enter on Mac) clicks the visible Accept button in the active form.
+  // Query tabs handle Ctrl+Enter themselves (Run); report tabs have no form.
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.key !== 'Enter') return;
+    if (!document.getElementById('modal-backdrop').classList.contains('hidden')) return;
+    const active = Tabs.getActiveId();
+    if (!active || active.startsWith('qry-') || active.startsWith('rpt-')) return;
+    const panel = document.getElementById(`panel-${active}`);
+    if (!panel) return;
+    const btn = panel.querySelector('.btn-primary:not(.hidden)');
+    if (!btn) return;
+    e.preventDefault();
+    btn.click();
+  });
+
   // ── Menu wiring ─────────────────────────────────────────────────────────────
 
   function wireMenu() {
@@ -567,6 +591,7 @@ const App = (() => {
 
   async function init() {
     await DB.init();
+    DB.setChangeListener(() => _renderStatus());
     _lastFileHandle = await _loadHandleFromIDB();
     wireMenu();
     wireTabBar();

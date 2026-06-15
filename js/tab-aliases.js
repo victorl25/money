@@ -40,6 +40,7 @@ const AliasesTab = (() => {
       </div>
       <div class="form-col-btns">
         <button id="fa-new"     class="btn btn-secondary">New</button>
+        <button id="fa-delete"  class="btn btn-danger hidden">Delete</button>
         <button id="fa-convert" class="btn btn-secondary hidden">Convert to Pattern</button>
         <div class="btn-spacer"></div>
         <button id="fa-accept"  class="btn btn-primary hidden">Accept</button>
@@ -60,11 +61,13 @@ const AliasesTab = (() => {
       document.getElementById('fa-alias').value    = '';
       document.getElementById('fa-payee').value    = '';
       document.getElementById('fa-payee-id').value = '';
+      document.getElementById('fa-delete').classList.add('hidden');
       setDirty(false);
       document.getElementById('fa-accept').classList.remove('hidden');
       document.getElementById('fa-convert').classList.add('hidden');
     });
 
+    document.getElementById('fa-delete').addEventListener('click', handleDelete);
     document.getElementById('fa-accept').addEventListener('click', commit);
     document.getElementById('fa-convert').addEventListener('click', convertToPattern);
   }
@@ -89,6 +92,7 @@ const AliasesTab = (() => {
       listEl.innerHTML = '';
     });
     inputEl.addEventListener('blur', () => setTimeout(() => { listEl.innerHTML = ''; }, 150));
+    addAcKeyboard(inputEl, listEl);
   }
 
   function setDirty(v) {
@@ -204,6 +208,7 @@ const AliasesTab = (() => {
       document.getElementById('fa-alias').value    = _selectedRow.Alias      || '';
       document.getElementById('fa-payee').value    = _selectedRow.Payee_Name || '';
       document.getElementById('fa-payee-id').value = String(_selectedRow.Payee_ID || '');
+      document.getElementById('fa-delete').classList.remove('hidden');
       setDirty(false);
     });
   }
@@ -229,6 +234,7 @@ const AliasesTab = (() => {
         const el = document.getElementById(fId); if (el) el.value = '';
       });
       setDirty(false);
+      document.getElementById('fa-delete').classList.add('hidden');
       document.getElementById('fa-convert').classList.add('hidden');
       _table.setData(loadData()).then(() => {
         const newRows = _table.getRows('active');

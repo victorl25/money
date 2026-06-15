@@ -1,8 +1,10 @@
 /* Database layer — wraps sql.js */
 
 const DB = (() => {
-  let _db  = null;
-  let _SQL = null;
+  let _db             = null;
+  let _SQL            = null;
+  let _changeCount    = 0;
+  let _changeListener = null;
 
   // ── Initialisation ────────────────────────────────────────────────────────
 
@@ -15,6 +17,7 @@ const DB = (() => {
     _db.run('PRAGMA foreign_keys = ON;');
     _db.run(SCHEMA_SQL);
     _db.run(SEED_SQL);
+    _changeCount = 0;
   }
 
   function loadFromBytes(bytes) {
@@ -31,6 +34,7 @@ const DB = (() => {
     try { _db.run('ALTER TABLE Mappings ADD COLUMN Negate INTEGER DEFAULT 0'); } catch {} // no-op if already present
     try { _db.run("ALTER TABLE Categories ADD COLUMN Type TEXT DEFAULT 'Expense'"); } catch {}
     try { _db.run('ALTER TABLE Categories ADD COLUMN Notes TEXT'); } catch {}
+    _changeCount = 0;
   }
 
   function exportBytes() {
@@ -43,6 +47,10 @@ const DB = (() => {
 
   function run(sql, params) {
     _db.run(sql, params || []);
+    if (/^\s*(INSERT|UPDATE|DELETE)/i.test(sql)) {
+      _changeCount++;
+      if (_changeListener) _changeListener(_changeCount);
+    }
   }
 
   function query(sql, params) {
@@ -227,10 +235,15 @@ const DB = (() => {
     return refs;
   }
 
+  function getChangeCount()        { return _changeCount; }
+  function resetChangeCount()      { _changeCount = 0; }
+  function setChangeListener(fn)   { _changeListener = fn; }
+
   return {
     init, createNew, loadFromBytes, exportBytes, isOpen,
     run, query, queryOne,
     lookupPayee, getLastCategory, createPayee,
-    recalcAccountBalance, checkRefs
+    recalcAccountBalance, checkRefs,
+    getChangeCount, resetChangeCount, setChangeListener
   };
 })();

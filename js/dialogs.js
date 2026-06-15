@@ -1,5 +1,46 @@
 /* Modal dialog utilities */
 
+/**
+ * Adds ArrowUp/ArrowDown/Enter/Escape keyboard navigation to any autocomplete
+ * input + dropdown list pair.  Call once per attach function, passing the text
+ * input and the <div class="ac-list"> element.  Selection is triggered by
+ * dispatching a synthetic mousedown on the highlighted item so the caller's
+ * existing mousedown handler handles all value-setting logic.
+ */
+function addAcKeyboard(inputEl, listEl) {
+  let _idx = -1;
+
+  function _setHighlight(idx) {
+    _idx = idx;
+    Array.from(listEl.querySelectorAll('.ac-item')).forEach((el, i) =>
+      el.classList.toggle('ac-active', i === _idx)
+    );
+  }
+
+  inputEl.addEventListener('input', () => { _idx = -1; });
+  inputEl.addEventListener('blur',  () => { _idx = -1; });
+
+  inputEl.addEventListener('keydown', e => {
+    const items = Array.from(listEl.querySelectorAll('.ac-item'));
+    if (!items.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _setHighlight(_idx < items.length - 1 ? _idx + 1 : _idx);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _setHighlight(_idx > 0 ? _idx - 1 : 0);
+    } else if (e.key === 'Enter' && _idx >= 0) {
+      e.preventDefault();
+      items[_idx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      _idx = -1;
+    } else if (e.key === 'Escape') {
+      listEl.innerHTML = '';
+      _idx = -1;
+    }
+  });
+}
+
 const Dialogs = (() => {
   const backdrop = () => document.getElementById('modal-backdrop');
   const container = () => document.getElementById('modal-container');
@@ -511,9 +552,36 @@ const Dialogs = (() => {
             <button id="dlg-cancel" class="btn btn-secondary">Cancel</button>
           </div>
         </div>`);
-      document.getElementById('dlg-single').onclick = () => { _hide(); resolve('single'); };
-      document.getElementById('dlg-all').onclick    = () => { _hide(); resolve('all'); };
-      document.getElementById('dlg-cancel').onclick = () => { _hide(); resolve(null); };
+
+      const singleBtn = document.getElementById('dlg-single');
+      const allBtn    = document.getElementById('dlg-all');
+      const cancelBtn = document.getElementById('dlg-cancel');
+      const buttons   = [singleBtn, allBtn, cancelBtn];
+
+      const done = result => { document.removeEventListener('keydown', onKey); _hide(); resolve(result); };
+      singleBtn.onclick = () => done('single');
+      allBtn.onclick    = () => done('all');
+      cancelBtn.onclick = () => done(null);
+
+      const onKey = e => {
+        if      (e.key === 's' || e.key === 'S')      { e.preventDefault(); done('single'); }
+        else if (e.key === 'a' || e.key === 'A')      { e.preventDefault(); done('all'); }
+        else if (e.key === 'c' || e.key === 'C')      { e.preventDefault(); done(null); }
+        else if (e.key === 'Escape')                   { e.preventDefault(); done(null); }
+        else if (e.key === 'Enter') {
+          e.preventDefault();
+          if      (document.activeElement === allBtn)    done('all');
+          else if (document.activeElement === cancelBtn) done(null);
+          else                                           done('single');
+        }
+        else if (e.key === 'Tab') {
+          e.preventDefault();
+          const idx = buttons.indexOf(document.activeElement);
+          buttons[(idx + 1) % buttons.length].focus();
+        }
+      };
+      document.addEventListener('keydown', onKey);
+      singleBtn.focus();
     });
   }
 

@@ -16,12 +16,13 @@ A personal finance application for reviewing, categorising, and reporting on cre
 
 ## Getting Started
 
-Download a standalone version of Chromium, unpack and place it into the `chrome\` folder. The application expects `chrome\chrome.exe`.
-Windows version download is available here: https://github.com/Hibbiki/chromium-win64, MacOS version download is available here: https://chromium.woolyss.com/download/#mac-arm. On MacOS use `xattr -cr /Applications/Chromium.app` to prevent system errors when launching the Chromium app.
+Download a standalone version of Chromium, unpack and place it into the `chrome` folder. The application expects `chrome\chrome.exe` on Windows or `chrome/Chromium` on macOS.
 
-Double-click **`money.bat`** to launch the application. On first run it creates a `data\` folder next to the batch file and opens an empty database. Use **File › Save** to give it a name. If you prefer a different location for the database files, provide the data folder location as a command line argument or edit `money.bat` to change the default value.
+Windows version download is available from https://github.com/Hibbiki/chromium-win64, macOS version download is available from https://chromium.woolyss.com/download/#mac-arm. On macOS use `xattr -cr chrome/Chromium` to prevent system errors when launching Chromium.
 
-On subsequent launches `money.bat` automatically opens the most recently saved database file from the `data\` folder.
+Run **`money.bat`** or **`money.sh`** to launch the application (use `chmod +x` to set permissions on macOS). On first run it creates a `data` folder and creates an empty database in memory. Use **File › Save** to give it a name. If you prefer a different location for the database files, provide the data folder location as a command line argument or edit the launching script file to change the default value.
+
+On subsequent launches the script automatically opens the most recently saved database file from the `data` folder.
 
 ---
 
@@ -34,7 +35,7 @@ On subsequent launches `money.bat` automatically opens the most recently saved d
 | **File › Save** | Writes the current database to a new timestamped file |
 | **File › Import** | Imports transactions from CSV, OFX, QFX, or QIF files |
 
-**Tip — automatic backups:** every Save writes a *new* file (`money_202506121430.db`). The previous file is never overwritten, so your entire save history is preserved in the `data\` folder. To recover an older version just open it with File › Open.
+**Tip — automatic backups:** every Save writes a *new* file (`money_202506121430.db`). The previous file is never overwritten, so your entire save history is preserved in the `data` folder. To recover an older version just open it with File › Open.
 
 ---
 
@@ -171,7 +172,7 @@ Both reports ask for a time frame — **Year to date**, **Previous year**, or **
 | **N** | Yes/No dialog | Click No |
 | **Tab** | Yes/No dialog | Toggle focus between Yes and No |
 | **Enter** | Yes/No dialog | Click the focused button |
-| **Ctrl+Enter** | Query tab | Run the SQL query |
+| **Ctrl + Enter** | Query tab | Run the SQL query |
 
 ---
 
@@ -180,3 +181,20 @@ Both reports ask for a time frame — **Year to date**, **Previous year**, or **
 The database is a standard SQLite file (`.db`). It is loaded entirely into memory while the application is running. All changes are **in-memory only** until you explicitly save.
 
 **Always save before closing the browser window.** The application will warn you if you try to close with an open database, but the warning is the browser's native dialog — no custom message is shown.
+
+---
+
+## Creating Application Shortcut
+
+On Windows drag `money.bat` to the desktop while pressing **Ctrl + Shift** to create a link. Right-click on the created link icon, select **Properties** and click **Change Icon** button. Browse to the application folder and select `wallet.ico` then OK the changes.
+
+On macOS open the **Automator** app (press **Cmd + Space** and search for "Automator"), click **New Document** and select **Application** as the document type. In the search box on the upper left, type "Run Shell Script" and double-click **Run Shell Script** from the results to add it to the workflow canvas.
+In the script text box enter the following commands:
+
+```bash
+cd /path/to/your/money.sh
+./money.sh
+```
+
+Use **File > Save** (or press **Cmd + S**) to name your file, set the destination to your Desktop, and ensure the file format is set to **Application**. Next navigate to the application folder and double-click on `wallet.png` to open it in Preview. Press **Cmd + A** to select the entire image, then press **Cmd + C** to copy it to your clipboard. Go to your application location, right-click your new Automator application icon, and choose **Get Info**. Click the tiny version of the application icon in the top-left corner of the Info window to highlight it and press **Cmd + V** to paste the new image over the default one. 
+

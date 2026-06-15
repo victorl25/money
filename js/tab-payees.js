@@ -34,6 +34,7 @@ const PayeesTab = (() => {
       <div class="form-col"></div>
       <div class="form-col-btns">
         <button id="fp-new"    class="btn btn-secondary">New</button>
+        <button id="fp-delete" class="btn btn-danger hidden">Delete</button>
         <div class="btn-spacer"></div>
         <button id="fp-accept" class="btn btn-primary hidden">Accept</button>
       </div>`;
@@ -43,10 +44,12 @@ const PayeesTab = (() => {
     document.getElementById('fp-new').addEventListener('click', () => {
       _isNewMode = true; _selectedRow = null;
       document.getElementById('fp-name').value = '';
+      document.getElementById('fp-delete').classList.add('hidden');
       setDirty(false);
       document.getElementById('fp-accept').classList.remove('hidden');
     });
 
+    document.getElementById('fp-delete').addEventListener('click', handleDelete);
     document.getElementById('fp-accept').addEventListener('click', commit);
   }
 
@@ -114,6 +117,7 @@ const PayeesTab = (() => {
       _selectedRow = row.getData();
       _isNewMode   = false;
       document.getElementById('fp-name').value = _selectedRow.Name || '';
+      document.getElementById('fp-delete').classList.remove('hidden');
       setDirty(false);
     });
   }
@@ -141,7 +145,8 @@ const PayeesTab = (() => {
       const pos = _table.getRows('active').findIndex(r => r.getData().Payee_ID === id);
       DB.run('UPDATE Payees SET Active = 0 WHERE Payee_ID = ?', [id]);
       _selectedRow = null;
-      if (document.getElementById('fp-name')) document.getElementById('fp-name').value = '';
+      if (document.getElementById('fp-name'))   document.getElementById('fp-name').value = '';
+      if (document.getElementById('fp-delete')) document.getElementById('fp-delete').classList.add('hidden');
       setDirty(false);
       _table.setData(loadData()).then(() => {
         const newRows = _table.getRows('active');
