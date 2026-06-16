@@ -1,5 +1,7 @@
 /* Main application — init, menu wiring, tab management, file I/O */
 
+const APP_VERSION = '1.0';
+
 const App = (() => {
   let _activeTabId    = null;
   let _lastFileHandle = null;        // FileSystemFileHandle from last open/save
@@ -101,9 +103,10 @@ const App = (() => {
   // ── Status bar ────────────────────────────────────────────────────────────────
 
   function _renderStatus() {
-    const n = DB.getChangeCount();
+    const n    = DB.getChangeCount();
+    const base = `v${APP_VERSION} ${_statusBase}`;
     document.getElementById('db-status').textContent =
-      n > 0 ? `${_statusBase} (+${n})` : _statusBase;
+      n > 0 ? `${base} (+${n})` : base;
   }
 
   function setStatus(text) {
@@ -555,6 +558,7 @@ const App = (() => {
     bind('cmd-view-categories', () => CategoriesTab.open());
     bind('cmd-report-category', () => SpendByCategoryReport.open());
     bind('cmd-report-payee',    () => SpendByPayeeReport.open());
+    bind('cmd-report-cashflow', () => CashFlowReport.open());
   }
 
   function closeAllMenus() {

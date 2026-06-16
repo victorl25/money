@@ -152,8 +152,9 @@ const CategoriesTab = (() => {
   async function handleDelete() {
     if (!_selectedRow) return;
     const id   = _selectedRow.Category_ID;
-    if (id === 1) {
-      await Dialogs.alert('Cannot Delete', 'The default "Unassigned" category cannot be deleted.');
+    if (id === 1 || id === 2) {
+      const name = id === 1 ? 'Unassigned' : 'Transfer';
+      await Dialogs.alert('Cannot Delete', `The "${name}" category is required by the application and cannot be deleted.`);
       return;
     }
     const refs = DB.checkRefs('Category', id);

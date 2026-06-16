@@ -701,6 +701,79 @@ a.cell-link:hover { text-decoration: underline; }
   text-align: center;
 }
 
+/* ── Monthly Cash Flow Report ───────────────────────────────────────── */
+.rpt-cf-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.rpt-cf-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rpt-cf-hdr th {
+  background: #2c3e50;
+  color: #fff;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.rpt-cf-cat {
+  text-align: left;
+  min-width: 180px;
+  padding: 6px 14px 6px 10px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.rpt-cf-num {
+  text-align: right;
+  min-width: 74px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e8e8e8;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpt-cf-rowtotal {
+  font-weight: 600;
+  border-left: 2px solid #dde3ea;
+  background: #f4f6f8;
+}
+
+.rpt-cf-neg { color: #c0392b; }
+
+.rpt-cf-row:nth-child(even) td { background: #f8f9fa; }
+.rpt-cf-row:nth-child(even) td.rpt-cf-rowtotal { background: #edf0f3; }
+.rpt-cf-row:hover td            { background: #eef2f7; }
+.rpt-cf-row:hover td.rpt-cf-rowtotal { background: #e4eaf2; }
+
+.rpt-cf-grp-cell {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: #5a7491 !important;
+  padding: 5px 10px;
+  border-bottom: none;
+}
+
+.rpt-cf-netrow td {
+  font-weight: 700;
+  background: #eef2f7 !important;
+  border-top: 2px solid #2c3e50;
+  border-bottom: none;
+  padding: 7px 12px;
+}
+
+.rpt-cf-netrow td.rpt-cf-rowtotal {
+  background: #e4eaf2 !important;
+}
+
 /* ── Tabulator overrides ────────────────────────────────────────────── */
 .tabulator {
   border: none;
