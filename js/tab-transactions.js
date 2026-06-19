@@ -670,6 +670,17 @@ const TransactionsTab = (() => {
     }
     const linkedId = await Dialogs.mergePopup(candidates);
     if (linkedId == null) return;
+
+    // When deactivating a Credit/Debit and keeping a Transfer, carry the Reference_ID over
+    if (row.Type !== 'Transfer' && row.Reference_ID) {
+      const survivor = DB.queryOne(
+        'SELECT Type FROM Transactions WHERE Transaction_ID = ?', [linkedId]);
+      if (survivor && survivor.Type === 'Transfer') {
+        DB.run('UPDATE Transactions SET Reference_ID = ? WHERE Transaction_ID = ?',
+          [row.Reference_ID, linkedId]);
+      }
+    }
+
     DB.run(
       `UPDATE Transactions SET Linked_Transaction_ID = ?, Valid = 0 WHERE Transaction_ID = ?`,
       [linkedId, row.Transaction_ID]

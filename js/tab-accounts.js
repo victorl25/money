@@ -167,6 +167,9 @@ const AccountsTab = (() => {
       virtualDom:   true,
       selectableRows: 1,
       headerSortTristate: true,
+      rowFormatter: row => {
+        row.getElement().style.fontWeight = row.getData().To_Review > 0 ? '700' : '';
+      },
       columns: [
         { title: 'Name',         field: 'Name',         widthGrow: 2, formatter: nameFormatter, headerFilter: 'input', headerSortTristate: true },
         { title: 'Type',         field: 'Type',         width: 130,   headerFilter: 'input', headerSortTristate: true },

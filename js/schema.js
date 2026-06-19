@@ -86,6 +86,6 @@ CREATE TABLE IF NOT EXISTS Mappings (
 `;
 
 const SEED_SQL = `
-INSERT INTO Categories (Category_ID, Name, Type, Active) VALUES (1, 'Unassigned', 'Expense', 1);
-INSERT INTO Categories (Category_ID, Name, Type, Active) VALUES (2, 'Transfer', 'Other', 1);
+INSERT INTO Categories (Category_ID, Name, Type, Notes, Active) VALUES (1, 'Unassigned', 'Expense', 'Special category for not yet assigned transactions, default for new, unmatched transactions', 1);
+INSERT INTO Categories (Category_ID, Name, Type, Notes, Active) VALUES (2, 'Transfer', 'Other', 'Special category to manage inter-account transfers', 1);
 `;

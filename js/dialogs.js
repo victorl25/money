@@ -187,7 +187,7 @@ const Dialogs = (() => {
         : `<p style="color:#999;font-style:italic;margin-top:6px">No existing accounts — use Create New Account.</p>`;
       const ignoreHtml = opts.showIgnoreKnown
         ? `<label class="dlg-checkbox-label">
-             <input type="checkbox" id="dlg-ignore-known"> Ignore known transactions
+             <input type="checkbox" id="dlg-ignore-known" checked> Ignore known transactions
            </label>`
         : '';
       _show(`

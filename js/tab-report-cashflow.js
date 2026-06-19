@@ -59,11 +59,11 @@ const CashFlowReport = (() => {
 
         if (val === 'ytd') {
           resolve({ dateFrom: `${curYear}-01-01`, dateTo: `${curYear}-12-31`,
-                    year: curYear, label: 'Year to date' });
+                    year: curYear, label: 'Year to date', key: 'ytd' });
 
         } else if (val === 'prev') {
           resolve({ dateFrom: `${prevYear}-01-01`, dateTo: `${prevYear}-12-31`,
-                    year: prevYear, label: String(prevYear) });
+                    year: prevYear, label: String(prevYear), key: 'prev' });
 
         } else {
           const yearStr = await Dialogs.prompt('Specific Year',
@@ -76,7 +76,7 @@ const CashFlowReport = (() => {
             return;
           }
           resolve({ dateFrom: `${y}-01-01`, dateTo: `${y}-12-31`,
-                    year: y, label: String(y) });
+                    year: y, label: String(y), key: String(y) });
         }
       });
     });
@@ -117,7 +117,7 @@ const CashFlowReport = (() => {
     for (const r of rows) {
       if (r.mo > endMo) continue;
       if (!catMap[r.Category_ID]) {
-        catMap[r.Category_ID] = { name: r.cat_name, type: r.cat_type, byMonth: {}, rowTotal: 0 };
+        catMap[r.Category_ID] = { id: r.Category_ID, name: r.cat_name, type: r.cat_type, byMonth: {}, rowTotal: 0 };
       }
       catMap[r.Category_ID].byMonth[r.mo] = r.total;
       catMap[r.Category_ID].rowTotal += r.total;
@@ -181,7 +181,7 @@ const CashFlowReport = (() => {
       for (const c of grpCats) {
         bodyHtml += `
           <tr class="rpt-cf-row">
-            <td class="rpt-cf-cat">${c.name}</td>
+            <td class="rpt-cf-cat"><a class="cell-link" data-cat-id="${c.id}" data-cat-name="${c.name}">${c.name}</a></td>
             ${months.map(m => {
               const v = c.byMonth[m] || 0;
               return `<td class="rpt-cf-num${v < 0 ? ' rpt-cf-neg' : ''}">${_fmt(v)}</td>`;
@@ -220,6 +220,14 @@ const CashFlowReport = (() => {
           </table>
         </div>
       </div>`;
+
+    panel.querySelector('.rpt-cf-table').addEventListener('click', e => {
+      const link = e.target.closest('.cell-link[data-cat-id]');
+      if (!link) return;
+      const catId   = parseInt(link.dataset.catId, 10);
+      const catName = link.dataset.catName;
+      TransactionsTab.openForCategoryFiltered(catId, catName, frame.dateFrom, frame.dateTo, `cf-${frame.key}`);
+    });
   }
 
   // ── Public ────────────────────────────────────────────────────────────────────
